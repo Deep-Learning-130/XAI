@@ -1,0 +1,83 @@
+"""The command line surface."""
+import json
+
+import pytest
+
+from dbias.cli import main
+from dbias.synthetic import make_audit_scenario
+
+
+@pytest.fixture
+def csv_path(tmp_path):
+    df, _ = make_audit_scenario(n=400, seed=1)
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+def test_audit_writes_json_and_a_figure(csv_path, tmp_path):
+    out = tmp_path / "out"
+    code = main([
+        "audit", str(csv_path),
+        "--sensitive", "gender", "--sensitive", "ethnicity",
+        "--target", "hired", "--sesoi", "0.1",
+        "--out", str(out), "--resamples", "200", "--seed", "7",
+    ])
+    assert code == 0
+    assert (out / "audit.json").exists()
+    assert (out / "coverage_map.png").exists()
+
+
+def test_written_json_records_the_declared_sesoi(csv_path, tmp_path):
+    out = tmp_path / "out"
+    main([
+        "audit", str(csv_path), "--sensitive", "gender", "--target", "hired",
+        "--sesoi", "0.15", "--out", str(out), "--resamples", "200", "--seed", "7",
+    ])
+    report = json.loads((out / "audit.json").read_text())
+    assert report["configuration"]["sesoi"] == pytest.approx(0.15)
+
+
+def test_sesoi_is_a_required_argument(csv_path, tmp_path):
+    """plan.md Sec 3.6: no silent default. The user declares what matters."""
+    with pytest.raises(SystemExit) as exit_info:
+        main(["audit", str(csv_path), "--sensitive", "gender",
+              "--out", str(tmp_path / "out")])
+    assert exit_info.value.code != 0
+
+
+def test_at_least_one_sensitive_attribute_is_required(csv_path, tmp_path):
+    """The tool suggests candidates; it never decides. Both review documents
+    are firm on this and they are right."""
+    with pytest.raises(SystemExit):
+        main(["audit", str(csv_path), "--sesoi", "0.1", "--out", str(tmp_path / "o")])
+
+
+def test_a_missing_file_fails_cleanly(tmp_path):
+    code = main(["audit", str(tmp_path / "nope.csv"), "--sensitive", "g",
+                 "--sesoi", "0.1", "--out", str(tmp_path / "out")])
+    assert code == 2
+
+
+def test_an_unknown_column_fails_cleanly(csv_path, tmp_path):
+    code = main(["audit", str(csv_path), "--sensitive", "nonexistent",
+                 "--sesoi", "0.1", "--out", str(tmp_path / "out")])
+    assert code == 2
+
+
+def test_demo_runs_end_to_end(tmp_path):
+    out = tmp_path / "demo"
+    assert main(["demo", "--out", str(out), "--resamples", "200"]) == 0
+    assert (out / "audit.json").exists()
+    assert (out / "coverage_map.png").exists()
+    assert (out / "scenario.csv").exists()
+
+
+def test_demo_reports_its_own_ground_truth(tmp_path):
+    """The demo is only worth anything if the true effects are stated, so the
+    reader can check the verdict against them."""
+    out = tmp_path / "demo"
+    main(["demo", "--out", str(out), "--resamples", "200"])
+    truth = json.loads((out / "ground_truth.json").read_text())
+    assert truth["true_effects"]["ethnicity"] > 0.1
+    assert truth["true_effects"]["gender"] == 0
