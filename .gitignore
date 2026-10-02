@@ -5,3 +5,4 @@ build/
 dist/
 datasets/
 out/
+*_audit.json

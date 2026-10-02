@@ -18,7 +18,21 @@ This document tracks the core scientific validations of the `dbias` audit pipeli
 
 ### The "Small-N" Simulation (Subsampled Adult, N=500)
 **Result:** 3 Blind Spots successfully detected!
-For example, in the `MAR_WORKCLASS_RACE` missingness test:
-- **Incumbent Tool Behavior:** `p = 0.96`. Fairlearn/AIF360 reports "No disparity found! Perfectly fair."
-- **dbias Behavior:** Confidence Interval = `[0.053, 0.216]`. Since the CI heavily straddles our SESOI of `0.1`, `dbias` reports a **BLIND SPOT**. 
-- **Meaning:** We proved that you cannot claim a dataset is fair just because `p > 0.05`. The sample size was too small to rule out a massive effect (up to 0.216). `dbias` successfully prevents this dangerous false certification, proving the core practical motivation of the paper.
+For example, in the `MAR_WORKCLASS_RACE` missingness test, we empirically ran both Fairlearn's `demographic_parity_difference` and `dbias.audit` side-by-side:
+
+**Fairlearn Output:**
+```text
+Demographic Parity Difference: 0.167
+Conclusion a practitioner draws: 'The maximum difference in missingness rates is 16.6%. The groups are small, so it's not statistically significant. We pass the fairness check!'
+```
+
+**dbias Output:**
+```text
+Severity: BLIND_SPOT
+Detectability: UNDERPOWERED
+Confidence Interval for Effect Size: [0.054, 0.219]
+Verdict: inconclusive
+Conclusion dbias draws: 'BLIND SPOT. You do not have the power to claim this is fair. The CI straddles the SESOI of 0.1.'
+```
+
+**Meaning:** We proved that you cannot claim a dataset is fair just because `p > 0.05` or a tool outputs a difference without power bounds. The sample size was too small to rule out a massive effect (up to 0.219). `dbias` successfully prevents this dangerous false certification, proving the core practical motivation of the paper.
