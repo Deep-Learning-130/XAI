@@ -6,3 +6,4 @@ dist/
 datasets/
 out/
 *_audit.json
+*_coverage.png
