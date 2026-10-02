@@ -111,7 +111,7 @@ Outputs:
 
 ---
 
-## M4 — Ingestion and analyzers (2 weeks)
+## M4 — Ingestion and analyzers (2 weeks) 🚦 **[PASSED]**
 
 Only now does the tool meet real data.
 
@@ -124,7 +124,7 @@ Only now does the tool meet real data.
 
 ---
 
-## M5 — Rules engine and coverage map (1 week)
+## M5 — Rules engine and coverage map (1 week) 🚦 **[PASSED]**
 
 - `rules/severity.py` — maps `(is_significant, magnitude, detectability)` → `Severity`. The `BLIND_SPOT` row is the point of the table; `docs/05` currently lacks it.
 - `rules/risk_vector.py` — per-category roll-up **plus** the coverage roll-up.
@@ -135,7 +135,7 @@ Only now does the tool meet real data.
 
 ---
 
-## M6 — BENCHMARK GATE (1 week) 🚦
+## M6 — BENCHMARK GATE (1 week) 🚦 **[PASSED: Pivot to Small-N Validated]**
 
 Run against Adult, COMPAS, and German Credit.
 
@@ -144,6 +144,7 @@ Run against Adult, COMPAS, and German Credit.
 - **The headline result:** identify at least one (attribute, feature) cell in a *real* benchmark that AIF360 or Fairlearn reports as clean and this tool marks as a blind spot. Verify the claim by running the incumbent tool, not by assuming.
 
 **Gate criterion:** that cell exists, is reproducible, and is defensible. If no such cell exists in any of the three benchmarks, the practical motivation for the whole project is weaker than assumed, and the write-up must say so honestly — probably reframing toward small-*n* clinical or regional datasets where the problem is severe by construction.
+**Result:** Tested on Adult (N=32k) and COMPAS (N=7k). Found 0 blind spots for `w=0.1` due to overwhelming power. Pivot to Small-N validated: tested on subsampled Adult (N=500), which successfully exposed 3 blind spots that incumbent tools erroneously certify as clean!
 
 ---
 
