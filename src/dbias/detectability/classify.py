@@ -82,6 +82,7 @@ def annotate_detectability(
     target_power: float = DEFAULT_TARGET_POWER,
     n_resamples: int = DEFAULT_RESAMPLES,
     seed: int | None = None,
+    skip_interval: bool = False,
 ) -> Finding:
     """Return a copy of `finding` carrying its detectability annotation.
 
@@ -144,14 +145,19 @@ def annotate_detectability(
             target_power=target_power,
         )
 
-    ci_lo, ci_hi = interval(n_resamples, 1.0 - alpha, seed)
-
-    if ci_hi < sesoi_v:
-        verdict = EquivalenceVerdict.EQUIVALENT
-    elif ci_lo > sesoi_v:
-        verdict = EquivalenceVerdict.DISPARITY
-    else:
+    if skip_interval:
+        # Power-guided descent: skip expensive bootstrap if parent was underpowered
+        ci_lo, ci_hi = 0.0, 1.0
         verdict = EquivalenceVerdict.INCONCLUSIVE
+    else:
+        ci_lo, ci_hi = interval(n_resamples, 1.0 - alpha, seed)
+
+        if ci_hi < sesoi_v:
+            verdict = EquivalenceVerdict.EQUIVALENT
+        elif ci_lo > sesoi_v:
+            verdict = EquivalenceVerdict.DISPARITY
+        else:
+            verdict = EquivalenceVerdict.INCONCLUSIVE
 
     detectability = (
         Detectability.ADEQUATE if power >= target_power else Detectability.UNDERPOWERED

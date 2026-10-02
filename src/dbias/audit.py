@@ -24,6 +24,8 @@ from dbias.analyzers.label_disparity import LabelDisparityAnalyzer
 from dbias.analyzers.missingness import MissingnessAnalyzer
 from dbias.analyzers.representation import RepresentationAnalyzer
 from dbias.analyzers.feature_disparity import FeatureDisparityAnalyzer
+from dbias.correction.hierarchy import build_intersections
+from dbias.correction.gating import power_guided_gating
 from dbias.detectability.classify import annotate_detectability
 from dbias.detectability.power import DEFAULT_ALPHA, DEFAULT_TARGET_POWER
 from dbias.models.enums import Category
@@ -77,16 +79,25 @@ def audit(
     if target_col is not None and target_col not in df.columns:
         raise ValueError(f"target column {target_col!r} not in the dataframe")
 
-    hypotheses: list[Hypothesis] = []
-    hypotheses += RepresentationAnalyzer(reference).analyze(df, sensitive_cols)
-    hypotheses += MissingnessAnalyzer().analyze(df, sensitive_cols)
-    hypotheses += FeatureDisparityAnalyzer().analyze(df, sensitive_cols, target_col=target_col)
-    if target_col is not None:
-        hypotheses += LabelDisparityAnalyzer().analyze(
-            df, sensitive_cols, target_col=target_col
-        )
+    # Step 1: Intersections
+    df, tree = build_intersections(df, sensitive_cols)
+    child_cols = list(set([c for children in tree.values() for c in children]))
+    
+    def _run_analyzers(cols: list[str]) -> list[Hypothesis]:
+        if not cols:
+            return []
+        hyps = []
+        hyps += RepresentationAnalyzer(reference).analyze(df, cols)
+        hyps += MissingnessAnalyzer().analyze(df, cols)
+        hyps += FeatureDisparityAnalyzer().analyze(df, cols, target_col=target_col)
+        if target_col is not None:
+            hyps += LabelDisparityAnalyzer().analyze(df, cols, target_col=target_col)
+        return hyps
 
-    annotated = [
+    # Step 2: Base hypotheses
+    base_hypotheses = _run_analyzers(sensitive_cols)
+    
+    base_annotated = [
         annotate_detectability(
             h.finding,
             h.sample,
@@ -96,8 +107,33 @@ def audit(
             n_resamples=n_resamples,
             seed=seed,
         )
-        for h in hypotheses
+        for h in base_hypotheses
     ]
+    
+    # Step 3: Gating child hypotheses
+    parent_findings = {
+        f"{f.category.name}_{f.target_feature}_{f.sensitive_attribute}": f 
+        for f in base_annotated
+    }
+    
+    child_hypotheses = _run_analyzers(child_cols)
+    gated_children = power_guided_gating(child_hypotheses, parent_findings, sesoi)
+    
+    child_annotated = [
+        annotate_detectability(
+            h.finding,
+            h.sample,
+            sesoi=sesoi,
+            alpha=alpha,
+            target_power=target_power,
+            n_resamples=n_resamples,
+            seed=seed,
+            skip_interval=skip,
+        )
+        for (h, skip) in gated_children
+    ]
+    
+    annotated = base_annotated + child_annotated
 
     corrected, families = _correct_within_families(annotated, alpha=alpha)
     scored = [assign_severity(f) for f in corrected]
