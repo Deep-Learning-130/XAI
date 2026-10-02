@@ -148,7 +148,7 @@ Run against Adult, COMPAS, and German Credit.
 
 ---
 
-## M7 — Intersectional gating (1.5 weeks)
+## M7 — Intersectional gating (1.5 weeks) 🚦 **[PASSED]**
 
 Now, and not before, descend into intersections.
 
