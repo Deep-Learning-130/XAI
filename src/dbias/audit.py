@@ -23,6 +23,7 @@ from dbias.analyzers.base import Hypothesis
 from dbias.analyzers.label_disparity import LabelDisparityAnalyzer
 from dbias.analyzers.missingness import MissingnessAnalyzer
 from dbias.analyzers.representation import RepresentationAnalyzer
+from dbias.analyzers.feature_disparity import FeatureDisparityAnalyzer
 from dbias.detectability.classify import annotate_detectability
 from dbias.detectability.power import DEFAULT_ALPHA, DEFAULT_TARGET_POWER
 from dbias.models.enums import Category
@@ -79,6 +80,7 @@ def audit(
     hypotheses: list[Hypothesis] = []
     hypotheses += RepresentationAnalyzer(reference).analyze(df, sensitive_cols)
     hypotheses += MissingnessAnalyzer().analyze(df, sensitive_cols)
+    hypotheses += FeatureDisparityAnalyzer().analyze(df, sensitive_cols, target_col=target_col)
     if target_col is not None:
         hypotheses += LabelDisparityAnalyzer().analyze(
             df, sensitive_cols, target_col=target_col
