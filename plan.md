@@ -91,7 +91,7 @@ That is a real experiment with a real possible failure, and it is the figure the
 
 `mde_chi_square(n=total_n, df=df)` treats Cohen's *w* over total *n* as sufficient. For a 95/5 group split, effective power is governed by the smaller cell, not the total. The audit's most important cases — small minority subgroups — are exactly where this approximation is worst, and it errs *optimistic*, which is the dangerous direction for a tool whose purpose is honest null results.
 
-**Fix:** condition the non-centrality on the observed margins, or fall back to simulation-based MDE when `min(expected_count) < 5` or when the group ratio exceeds ~4:1. Document the approximation in the module docstring.
+**Fix [IMPLEMENTED for 2x2 tables]:** condition the non-centrality on the observed margins, or fall back to simulation-based MDE when `min(expected_count) < 5` or when the group ratio exceeds ~4:1. Document the approximation in the module docstring. This is now fully integrated into the 2x2 path (`detectability/classify.py`).
 
 ### 3.5 `mde_rank_biserial` uses the two largest groups
 

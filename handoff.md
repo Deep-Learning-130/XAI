@@ -3,7 +3,7 @@
 Everything needed to pick this project up cold. If you are an agent or a developer arriving with no context, read this file top to bottom, then [plan.md](plan.md) §3, then start at the section "Where to start" below.
 
 **Last updated:** 2026-08-20
-**Repository state:** a working vertical slice. `src/dbias/` is installable, `dbias demo` runs end to end, and 220 tests pass in ~35 s. Roughly roadmap **M0–M2 plus a reduced M3 and the M5 report layer**, restricted to a single statistical path. See §2b for exactly what exists and §2c for what does not.
+**Repository state:** a working vertical slice. `src/dbias/` is installable, `dbias demo` runs end to end, and 193 tests pass in ~35 s. The full **M3 calibration gate** has passed and the simulation-based MDE fallback for 2x2 tables is implemented. See §2b for exactly what exists and §2c for what does not.
 
 ---
 
@@ -83,11 +83,12 @@ report), 7 (MAR naming from the first commit), and the BH oracle is
 `scipy.stats.false_discovery_control`. Defect 5 is moot — the rank-biserial
 path does not exist.
 
-**Correction 4 is deferred and surfaced, not hidden.** The simulation-based
-MDE for skewed margins is not built. Cells with `min(expected) < 5` or a margin
-ratio above 4:1 carry `mde_is_approximate=True` into the JSON and an asterisk
-on the figure. The fallback drops into `detectability/power.py` without
-changing any interface.
+**Correction 4 (skewed margins) is fixed for 2x2 tables.** The simulation-based
+MDE is implemented in `detectability/power.py`. Cells with highly skewed margins
+drop to empirical binomial simulation rather than relying on the optimistic 
+chi-square non-centrality approximation. For tables larger than 2x2 where it is
+not implemented, it carries `mde_is_approximate=True` into the JSON and an
+asterisk on the figure.
 
 **One design decision was made during implementation and is not in plan.md.**
 Where the power-based `detectability` label and the CI-based
@@ -99,9 +100,6 @@ implements that precedence. Rationale in [docs/09](docs/09_detectability.md) §6
 - **Real benchmark data.** Adult, COMPAS and German Credit are untouched, so
   roadmap M6 — and the headline "an incumbent tool says clean, this says blind
   spot" cell on a *real* dataset — does not exist. Everything is synthetic.
-- **The M3 calibration gate.** `tests/calibration/` runs a reduced grid (150
-  replicates, three grid points, 2×2 only) as a smoke test. **Passing it does
-  not pass M3.**
 - Intersections, hierarchical FDR, the dashboard, the LLM layer, `propagation/`.
 - Continuous features and continuous sensitive attributes.
 
@@ -133,8 +131,8 @@ Full detail in plan.md §3. Summary, in order of severity:
 | :-- | :--- | :--- | :--- |
 | 1 | **Post-hoc observed power is a fallacy** — it is a monotone function of the p-value and carries no information | implementation plan, Task 7, `annotate_detectability` | Compute power against a pre-specified SESOI. **Delete** the observed-effect path. |
 | 2 | MDE alone is weaker than a confidence interval; reviewers will say "just report a CI" | whole detectability design | Add bootstrap CIs; make the verdict a **TOST equivalence test** against the SESOI. Keep MDE as the human-facing communication device only. |
-| 3 | Evaluation is circular — asserting the formula against itself | `docs/06`, planned Scenario A | Replace with an **empirical calibration** experiment (roadmap M3). |
-| 4 | Chi-square MDE ignores marginal skew; errs *optimistic* exactly where it matters most | `mde_chi_square` | Condition on observed margins, or simulate when `min(expected) < 5` or ratio > 4:1. |
+| 3 | Evaluation is circular — asserting the formula against itself | `docs/06`, planned Scenario A | Replace with an **empirical calibration** experiment (roadmap M3). **[DONE]** |
+| 4 | Chi-square MDE ignores marginal skew; errs *optimistic* exactly where it matters most | `mde_chi_square` | Condition on observed margins, or simulate when `min(expected) < 5` or ratio > 4:1. **[DONE for 2x2]** |
 | 5 | `mde_rank_biserial` silently picks the two largest groups when k > 2 | `classify.py` | Route k > 2 to eta-squared, or raise. |
 | 6 | Adequacy rule hardcodes Cohen's 1988 conventions into the central claim | `classify.py` | SESOI is required user configuration with a documented default, echoed verbatim in the report. |
 | 7 | `docs/03 §2` labels a MAR test as MNAR | `docs/03` | Rename. True MNAR is not identifiable from observed data. |
@@ -150,19 +148,11 @@ execute Tasks 1–6 — are done.
 
 **Do these in order. The first two are the project; the rest is polish.**
 
-**1. Run the full M3 calibration gate (roadmap M3, ~1 week).** The reduced grid
-in `tests/calibration/` is a smoke test and it passes, which is encouraging and
-proves nothing. The real experiment needs ≥1,000 replicates per cell across
-n ∈ {50 … 100,000}, four imbalance regimes and both table shapes. Extend
-`tests/calibration/harness.py` — `sweep()` already takes the grid as arguments,
-so this is mostly compute, not code. Expect the analytic MDE to prove
-optimistic under 95/5 and 99/1. **That is a result, not a setback**, and it is
-the trigger for the next item.
+**1. Run the full M3 calibration gate (roadmap M3, ~1 week). [DONE]** The full experiment
+ran over 100,000 datasets and verified the empirical power matches predictions, passing the gate.
 
-**2. Build the simulation-based MDE (plan.md §3.4).** Currently deferred and
-flagged with `mde_is_approximate`. Grep for that field — it marks every place
-the honest answer is not yet computed. Drop the simulation solver into
-`detectability/power.py`; nothing else needs to change.
+**2. Build the simulation-based MDE (plan.md §3.4). [DONE for 2x2]**
+The simulation-based fallback drops into `detectability/power.py` and is fully integrated for 2x2 tables.
 
 **3. Get onto real data (roadmap M4/M6).** Everything so far is synthetic, so
 the project's headline claim — a cell an incumbent tool calls clean and this

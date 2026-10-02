@@ -144,10 +144,10 @@ def test_severity_is_untouched_by_the_detectability_pass():
 
 # --- the deferred correction is surfaced, not hidden -------------------------
 
-def test_skewed_margins_flag_the_mde_as_approximate():
-    """plan.md Sec 3.4 is deferred, so affected cells must be labelled."""
+def test_skewed_margins_trigger_simulation_and_are_not_approximate():
+    """plan.md Sec 3.4 is fixed for 2x2: affected cells drop to simulation."""
     skewed = np.array([[950, 50], [45, 5]])
-    assert annotate(skewed).mde_is_approximate is True
+    assert annotate(skewed).mde_is_approximate is False
 
 
 def test_balanced_margins_are_not_flagged():

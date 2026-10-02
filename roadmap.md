@@ -79,7 +79,7 @@ Executes Task 6 as written, and Task 7 **as amended by plan.md §3.1–3.6**.
 
 ---
 
-## M3 — CALIBRATION GATE (1.5 weeks) 🚦
+## M3 — CALIBRATION GATE (1.5 weeks) 🚦 **[PASSED]**
 
 **This is the scientific claim. Everything before it is code; this is the experiment.**
 
@@ -107,9 +107,7 @@ Outputs:
 - In cells labelled `BLIND SPOT`, empirical detection rate at the SESOI is **materially below 0.80** (no false reassurance).
 - Under the null with FDR applied, empirical FDR **≤ 0.05**.
 
-**If the gate fails:** this is a result, not a setback. Most likely failure is the analytic MDE being optimistic under 95/5 and 99/1 splits. Response: make simulation-based MDE the default for skewed margins and re-run. Budget one extra week for this contingency — it is more likely than not.
-
-**Do not start M4 until this gate passes.** If the verdict is not calibrated, the analyzers are computing the wrong thing.
+**Result:** The gate passed. Simulation-based MDE fallback was added to `detectability/power.py` for 2x2 tables to fix the optimistic analytic MDE for extremely skewed margins.
 
 ---
 

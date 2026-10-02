@@ -28,6 +28,8 @@ from dbias.detectability.power import (
     DEFAULT_TARGET_POWER,
     mde_cramers_v,
     power_chi_square,
+    simulate_mde_2x2,
+    simulate_power_2x2,
 )
 from dbias.models.enums import Detectability, EquivalenceVerdict
 from dbias.models.finding import Finding
@@ -103,14 +105,45 @@ def annotate_detectability(
 
     sesoi_v = v_from_w(sesoi, result.df_min)
 
-    power = power_chi_square(w=sesoi, n=result.n, dof=result.dof, alpha=alpha)
-    mde_v = mde_cramers_v(
-        n=result.n,
-        dof=result.dof,
-        df_min=result.df_min,
-        alpha=alpha,
-        target_power=target_power,
-    )
+    # Fallback to empirical simulation if analytic MDE is optimistic (plan.md Sec 3.4)
+    # The 2x2 fallback handles both power and MDE.
+    used_approximation = result.is_sparse or result.is_skewed
+    if used_approximation and result.dof == 1 and not isinstance(sample, GofSample):
+        table = np.asarray(sample, dtype=float)
+        row_sums = table.sum(axis=1)
+        col_sums = table.sum(axis=0)
+        
+        minority_share = float(row_sums.min() / result.n)
+        base_rate = float(col_sums[0] / result.n)
+        
+        power = simulate_power_2x2(
+            w=sesoi, 
+            n=result.n, 
+            minority_share=minority_share, 
+            base_rate=base_rate, 
+            alpha=alpha,
+            seed=seed
+        )
+        mde_v = simulate_mde_2x2(
+            n=result.n,
+            minority_share=minority_share,
+            base_rate=base_rate,
+            alpha=alpha,
+            target_power=target_power,
+            seed=seed
+        ) / np.sqrt(result.df_min)  # convert back to Cramer's V scale
+        
+        used_approximation = False # we just fixed it
+    else:
+        power = power_chi_square(w=sesoi, n=result.n, dof=result.dof, alpha=alpha)
+        mde_v = mde_cramers_v(
+            n=result.n,
+            dof=result.dof,
+            df_min=result.df_min,
+            alpha=alpha,
+            target_power=target_power,
+        )
+
     ci_lo, ci_hi = interval(n_resamples, 1.0 - alpha, seed)
 
     if ci_hi < sesoi_v:
@@ -130,7 +163,7 @@ def annotate_detectability(
         effect_size_ci=(ci_lo, ci_hi),
         power_to_detect_sesoi=power,
         minimum_detectable_effect=mde_v,
-        mde_is_approximate=result.is_sparse or result.is_skewed,
+        mde_is_approximate=used_approximation,
         equivalence_verdict=verdict,
         detectability=detectability,
     )
