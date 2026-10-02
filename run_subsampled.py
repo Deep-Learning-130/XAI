@@ -5,6 +5,7 @@ from dbias.ingestion.schema_inference import infer_schema
 from dbias.ingestion.sensitive_detection import suggest_sensitive_attributes
 from dbias.audit import audit
 from dbias.report.json_export import write_json
+from dbias.report.coverage_plot import plot_coverage_map
 
 def main():
     print("Fetching Adult dataset...")
@@ -39,6 +40,9 @@ def main():
         
     write_json(result, "subsampled_audit.json")
     print("Exported to subsampled_audit.json")
+    
+    plot_coverage_map(result, "subsampled_coverage.png")
+    print("Exported coverage plot to subsampled_coverage.png")
 
 if __name__ == "__main__":
     main()
