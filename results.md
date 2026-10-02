@@ -36,3 +36,12 @@ Conclusion dbias draws: 'BLIND SPOT. You do not have the power to claim this is 
 ```
 
 **Meaning:** We proved that you cannot claim a dataset is fair just because `p > 0.05` or a tool outputs a difference without power bounds. The sample size was too small to rule out a massive effect (up to 0.219). `dbias` successfully prevents this dangerous false certification, proving the core practical motivation of the paper.
+
+## 3. M7: Intersectional Gating (Passed)
+**Hypothesis:** Intersectional subgroups (e.g., "Black Females") suffer from sample size collapse. Testing all intersections blindly will inflate False Discovery Rates (FDR) and waste compute on tests that mathematically cannot achieve adequate statistical power.
+**Result:** 
+- Implemented **Power-Guided Descent**.
+- When run on the N=500 subsampled Adult dataset, the tool generated 17 new intersectional tests (`Race + Sex`).
+- For subgroups where the parent attribute lacked statistical power, the gating script aborted the test prior to the expensive bootstrap simulation.
+- The tool emitted explicit blind spots for these aborted tests (e.g., `MAR_WORKCLASS_SEX_AND_RACE` with CI `[0.000, 1.000]`).
+**Meaning:** The tool safely limits multiplicity and compute by refusing to test intersections that are mathematically doomed to fail. It explicitly flags the intersection as untested rather than quietly passing it.
