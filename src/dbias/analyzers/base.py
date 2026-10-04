@@ -7,6 +7,7 @@ leaves with `Severity.UNDETERMINED` and `Detectability.UNKNOWN`.
 """
 import re
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -38,6 +39,20 @@ class BaseAnalyzer(ABC):
         target_col: str | None = None,
     ) -> list[Hypothesis]:
         """Return un-scored, un-annotated hypotheses. Never assigns severity."""
+
+
+def excluded_features(
+    attribute: str, intersections: Mapping[str, Sequence[str]]
+) -> set[str]:
+    """Columns that must not be tested as features against `attribute`.
+
+    An attribute is never tested against itself. Intersection columns are
+    derived from the sensitive attributes, never features in their own right,
+    and an intersection is never tested against the parents it was built from
+    -- each of those comparisons is a column against a function of itself, and
+    shows a maximal association on any data.
+    """
+    return {attribute, *intersections, *intersections.get(attribute, ())}
 
 
 def slug(name: str) -> str:

@@ -11,7 +11,14 @@ Independent oracles used here:
 """
 import pytest
 
-from dbias.detectability.power import mde_chi_square, mde_cramers_v, power_chi_square
+from dbias.detectability.power import (
+    max_reachable_w_2x2,
+    mde_chi_square,
+    mde_cramers_v,
+    power_chi_square,
+    simulate_mde_2x2,
+    simulate_power_2x2,
+)
 
 
 def test_zero_effect_gives_power_equal_to_alpha():
@@ -89,3 +96,29 @@ def test_power_function_takes_no_observed_effect():
 
     params = set(inspect.signature(power_chi_square).parameters)
     assert params == {"w", "n", "dof", "alpha"}
+
+
+# --- the 2x2 simulation fallback ---------------------------------------------
+
+def test_reachable_w_is_one_for_balanced_margins():
+    """phi = 1 is the perfect 2x2 association, reachable only at 50/50."""
+    assert max_reachable_w_2x2(0.5, 0.5) == pytest.approx(1.0)
+    assert max_reachable_w_2x2(0.05, 0.2) < 1.0
+
+
+def test_simulated_mde_is_a_real_effect_not_the_search_ceiling():
+    """Regression: searching up to w = 5 always failed, so every skewed 2x2
+    reported MDE = 5.0."""
+    mde = simulate_mde_2x2(n=8_000, minority_share=0.2, base_rate=0.5, seed=0)
+    assert mde < 0.1
+    assert simulate_power_2x2(mde, 8_000, 0.2, 0.5, seed=0) == pytest.approx(0.80, abs=0.03)
+
+
+def test_simulated_mde_agrees_with_the_analytic_one_where_both_hold():
+    analytic = mde_chi_square(n=2_000, dof=1)
+    simulated = simulate_mde_2x2(n=2_000, minority_share=0.5, base_rate=0.5, seed=0)
+    assert simulated == pytest.approx(analytic, rel=0.05)
+
+
+def test_simulated_mde_reports_the_ceiling_when_nothing_reachable_is_detectable():
+    assert simulate_mde_2x2(n=20, minority_share=0.05, base_rate=0.1, seed=0) == 5.0

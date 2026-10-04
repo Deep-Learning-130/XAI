@@ -15,7 +15,9 @@ the smaller cell rather than by the total, and this approximation errs
 *optimistic*. That is the dangerous direction for a tool whose purpose is
 honest null results. Callers must propagate `ChiSquareResult.is_skewed` and
 `.is_sparse` so affected cells are reported as approximate. A simulation-based
-fallback is the correct fix and is deliberately deferred (plan.md Sec 3.4).
+fallback is the correct fix (plan.md Sec 3.4); it exists for 2x2 tables
+(`simulate_power_2x2` / `simulate_mde_2x2`) and is still deferred for larger
+ones.
 """
 import math
 
@@ -49,6 +51,59 @@ def power_chi_square(w: float, n: int, dof: int, alpha: float = DEFAULT_ALPHA) -
     return float(stats.ncx2.sf(critical, dof, noncentrality))
 
 
+def simulate_power_2x2(
+    w: float,
+    n: int,
+    minority_share: float,
+    base_rate: float,
+    alpha: float = DEFAULT_ALPHA,
+    n_sims: int = 5000,
+    seed: int | None = None,
+) -> float:
+    """Empirical power for a 2x2 table, conditioning on observed margins.
+
+    Solves the approximation error under skewed margins by directly simulating
+    binomial draws.
+    """
+    import numpy as np
+
+    if w < 0:
+        raise ValueError("w cannot be negative")
+
+    g2 = minority_share
+    g1 = 1.0 - g2
+    if w == 0.0:
+        p1, p2 = base_rate, base_rate
+    else:
+        d = w * math.sqrt(base_rate * (1.0 - base_rate) / (g1 * g2))
+        p1 = base_rate + g2 * d
+        p2 = base_rate - g1 * d
+        if not (0.0 <= p1 <= 1.0 and 0.0 <= p2 <= 1.0):
+            # Effect size is unreachable with these margins
+            return 0.0
+
+    rng = np.random.default_rng(seed)
+    n2 = max(1, int(round(n * minority_share)))
+    n1 = n - n2
+
+    events1 = rng.binomial(n1, p1, size=n_sims).astype(float)
+    events2 = rng.binomial(n2, p2, size=n_sims).astype(float)
+
+    a, b = events1, n1 - events1
+    c, d = events2, n2 - events2
+
+    # Fast 2x2 chi-square statistic: n * (ad - bc)^2 / (row1*row2*col1*col2)
+    col1 = a + c
+    col2 = b + d
+    
+    with np.errstate(divide="ignore", invalid="ignore"):
+        stat = n * (a * d - b * c) ** 2 / (n1 * n2 * col1 * col2)
+    stat[np.isnan(stat)] = 0.0
+
+    critical = stats.chi2.ppf(1.0 - alpha, 1)
+    return float(np.mean(stat > critical))
+
+
 def mde_chi_square(
     n: int,
     dof: int,
@@ -75,6 +130,54 @@ def mde_chi_square(
         # Even an implausibly large effect would not reach target power here.
         return float(hi)
     return float(optimize.brentq(shortfall, lo, hi, xtol=1e-12, rtol=1e-12))
+
+
+def max_reachable_w_2x2(minority_share: float, base_rate: float) -> float:
+    """Largest Cohen's w a 2x2 table with these margins can express.
+
+    `simulate_power_2x2` shifts the two groups' rates apart by d; the shift is
+    bounded by both rates staying inside [0, 1]. Past this point the
+    alternative does not exist, so it is the ceiling for any MDE search.
+    """
+    g2 = minority_share
+    g1 = 1.0 - g2
+    if not (0.0 < g2 < 1.0 and 0.0 < base_rate < 1.0):
+        return 0.0
+    d_max = min((1.0 - base_rate) / g2, base_rate / g1)
+    return d_max / math.sqrt(base_rate * (1.0 - base_rate) / (g1 * g2))
+
+
+def simulate_mde_2x2(
+    n: int,
+    minority_share: float,
+    base_rate: float,
+    alpha: float = DEFAULT_ALPHA,
+    target_power: float = DEFAULT_TARGET_POWER,
+    n_sims: int = 5000,
+    seed: int | None = None,
+) -> float:
+    """Simulation-based MDE for a 2x2 table.
+
+    Returns the analytic search ceiling (`_W_SEARCH[1]`) when no effect these
+    margins can express reaches `target_power` -- the same "nothing plausible
+    is detectable" sentinel `mde_chi_square` uses.
+    """
+    def shortfall(w: float) -> float:
+        return simulate_power_2x2(w, n, minority_share, base_rate, alpha, n_sims, seed) - target_power
+
+    lo = _W_SEARCH[0]
+    # Searching to the analytic ceiling would always fail: past the reachable
+    # maximum simulate_power_2x2 returns 0, so the bracket never changes sign.
+    # Back off a hair so the endpoint itself stays inside [0, 1] numerically.
+    hi = max_reachable_w_2x2(minority_share, base_rate) * (1.0 - 1e-9)
+
+    if hi <= lo or shortfall(hi) < 0:
+        return float(_W_SEARCH[1])
+
+    try:
+        return float(optimize.brentq(shortfall, lo, hi, xtol=1e-4, rtol=1e-4))
+    except ValueError:
+        return float(_W_SEARCH[1])
 
 
 def mde_cramers_v(

@@ -147,19 +147,20 @@ checked and found clean from one that could not be checked.
 
 ## 8. What is approximate, stated plainly
 
-**The MDE ignores marginal structure.** The non-centrality is taken as
+**The MDE ignores marginal structure.** The analytic non-centrality is taken as
 `n · w²`, which treats Cohen's *w* as sufficient for the alternative. Under a
 95/5 or 99/1 group split, effective power is governed by the smaller cell
 rather than by the total, and this approximation errs **optimistic** — the
 dangerous direction for a tool whose purpose is honest null results, and worst
 precisely for the small minority subgroups that matter most.
 
-The correct fix is a simulation-based MDE ([plan.md](../plan.md) §3.4). It is
-not implemented. Instead, every cell where `min(expected) < 5` or the margin
-ratio exceeds 4:1 is flagged `mde_is_approximate`, which is carried into the
-JSON and marked with an asterisk on the figure. The limitation is surfaced
-rather than hidden, and the simulation fallback drops into
-`detectability/power.py` without changing any interface.
+The correct fix is a simulation-based MDE ([plan.md](../plan.md) §3.4). **This is
+implemented for 2x2 tables.** For 2x2 tables with skewed margins
+(`min(expected) < 5` or margin ratio > 4:1), the pipeline drops to empirical
+binomial simulation in `detectability/power.py`. For tables larger than 2x2, the
+simulation fallback is not yet implemented; these carry `mde_is_approximate=True`
+into the JSON and an asterisk on the figure. The limitation is surfaced
+rather than hidden.
 
 **The equivalence test has a type-I error at the boundary.** When the true
 effect sits exactly on the SESOI, the interval will sometimes fall entirely

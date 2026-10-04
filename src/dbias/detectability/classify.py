@@ -28,6 +28,8 @@ from dbias.detectability.power import (
     DEFAULT_TARGET_POWER,
     mde_cramers_v,
     power_chi_square,
+    simulate_mde_2x2,
+    simulate_power_2x2,
 )
 from dbias.models.enums import Detectability, EquivalenceVerdict
 from dbias.models.finding import Finding
@@ -38,6 +40,9 @@ from dbias.stats.intervals import (
     bootstrap_ci_cramers_v,
     bootstrap_ci_gof_w,
 )
+
+# Seed for the 2x2 power simulation when the caller gives none.
+_SIMULATION_SEED = 0
 
 
 def _measure(sample: ArrayLike | GofSample):
@@ -80,6 +85,7 @@ def annotate_detectability(
     target_power: float = DEFAULT_TARGET_POWER,
     n_resamples: int = DEFAULT_RESAMPLES,
     seed: int | None = None,
+    skip_interval: bool = False,
 ) -> Finding:
     """Return a copy of `finding` carrying its detectability annotation.
 
@@ -103,34 +109,80 @@ def annotate_detectability(
 
     sesoi_v = v_from_w(sesoi, result.df_min)
 
-    power = power_chi_square(w=sesoi, n=result.n, dof=result.dof, alpha=alpha)
-    mde_v = mde_cramers_v(
-        n=result.n,
-        dof=result.dof,
-        df_min=result.df_min,
-        alpha=alpha,
-        target_power=target_power,
-    )
-    ci_lo, ci_hi = interval(n_resamples, 1.0 - alpha, seed)
+    # Fallback to empirical simulation if analytic MDE is optimistic (plan.md Sec 3.4)
+    # The 2x2 fallback handles both power and MDE.
+    used_approximation = result.is_sparse or result.is_skewed
+    if used_approximation and result.dof == 1 and not isinstance(sample, GofSample):
+        table = np.asarray(sample, dtype=float)
+        row_sums = table.sum(axis=1)
+        col_sums = table.sum(axis=0)
 
-    if ci_hi < sesoi_v:
-        verdict = EquivalenceVerdict.EQUIVALENT
-    elif ci_lo > sesoi_v:
-        verdict = EquivalenceVerdict.DISPARITY
+        minority_share = float(row_sums.min() / result.n)
+        base_rate = float(col_sums[0] / result.n)
+        # The simulation must not make the verdict vary between runs, so it
+        # never draws from fresh entropy even when the caller passes no seed.
+        sim_seed = _SIMULATION_SEED if seed is None else seed
+
+        power = simulate_power_2x2(
+            w=sesoi,
+            n=result.n,
+            minority_share=minority_share,
+            base_rate=base_rate,
+            alpha=alpha,
+            seed=sim_seed,
+        )
+        mde_v = simulate_mde_2x2(
+            n=result.n,
+            minority_share=minority_share,
+            base_rate=base_rate,
+            alpha=alpha,
+            target_power=target_power,
+            seed=sim_seed,
+        ) / np.sqrt(result.df_min)  # convert back to Cramer's V scale
+
+        # The simulation runs the same uncorrected chi-square the audit runs,
+        # so its power is the power of the test actually performed, up to
+        # Monte Carlo error -- not the marginal-blind n * w^2 approximation.
+        used_approximation = False
     else:
-        verdict = EquivalenceVerdict.INCONCLUSIVE
+        power = power_chi_square(w=sesoi, n=result.n, dof=result.dof, alpha=alpha)
+        mde_v = mde_cramers_v(
+            n=result.n,
+            dof=result.dof,
+            df_min=result.df_min,
+            alpha=alpha,
+            target_power=target_power,
+        )
 
     detectability = (
         Detectability.ADEQUATE if power >= target_power else Detectability.UNDERPOWERED
     )
 
+    if skip_interval and detectability is Detectability.UNDERPOWERED:
+        # Power-guided descent: the parent was underpowered and so is this
+        # cell, so the bootstrap is skipped. No interval was computed, so none
+        # is reported and there is no verdict; rules/ falls back to
+        # detectability, which reads an underpowered null as a blind spot.
+        effect_size_ci = None
+        verdict = None
+    else:
+        ci_lo, ci_hi = interval(n_resamples, 1.0 - alpha, seed)
+        effect_size_ci = (ci_lo, ci_hi)
+
+        if ci_hi < sesoi_v:
+            verdict = EquivalenceVerdict.EQUIVALENT
+        elif ci_lo > sesoi_v:
+            verdict = EquivalenceVerdict.DISPARITY
+        else:
+            verdict = EquivalenceVerdict.INCONCLUSIVE
+
     return dataclasses.replace(
         finding,
         sesoi=sesoi,
-        effect_size_ci=(ci_lo, ci_hi),
+        effect_size_ci=effect_size_ci,
         power_to_detect_sesoi=power,
         minimum_detectable_effect=mde_v,
-        mde_is_approximate=result.is_sparse or result.is_skewed,
+        mde_is_approximate=used_approximation,
         equivalence_verdict=verdict,
         detectability=detectability,
     )
