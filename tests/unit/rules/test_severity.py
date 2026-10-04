@@ -185,3 +185,28 @@ def test_detectability_alone_decides_when_no_interval_exists():
         equivalence_verdict=None,
     )
     assert f.severity is Severity.BLIND_SPOT
+
+
+def test_a_nonsignificant_interval_above_the_sesoi_is_never_an_all_clear():
+    """Regression: a non-significant finding with a DISPARITY verdict fell
+    through to detectability and, if power looked adequate, was scored
+    INFORMATIONAL -- the earned all-clear -- although its interval ruled
+    nothing out. Seen on sparse feature tables in the N=500 Adult run."""
+    f = finding(
+        is_significant=False,
+        detectability=Detectability.ADEQUATE,
+        equivalence_verdict=EquivalenceVerdict.DISPARITY,
+        effect_size_value=0.157,
+        effect_size_ci=(0.170, 0.287),
+    )
+    assert f.severity is Severity.BLIND_SPOT
+
+
+def test_an_adequately_powered_null_without_an_interval_is_informational():
+    f = finding(
+        is_significant=False,
+        detectability=Detectability.ADEQUATE,
+        equivalence_verdict=None,
+        effect_size_ci=None,
+    )
+    assert f.severity is Severity.INFORMATIONAL

@@ -42,7 +42,8 @@ def main():
         df=df,
         sensitive_cols=["race"],
         target_col="income",
-        sesoi=0.1
+        sesoi=0.1,
+        seed=0,
     )
     
     # Find the missingness finding for workclass by race
