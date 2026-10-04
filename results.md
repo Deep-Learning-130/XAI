@@ -8,8 +8,12 @@ scripts in the repository root, so re-running them reproduces it exactly.
 ## 1. M3: Calibration Gate (Passed)
 **Hypothesis:** The statistical inference layer must respect its nominal false positive rate (alpha) even under extreme marginal skew.
 **Result** (`tests/calibration/run_m3_gate.py`, results in `tests/calibration/results/m3_calibration_results.csv`):
-<!-- M3_RESULTS -->
-- **Meaning:** When the tool flags a disparity, it holds its nominal error rate. It does not falsely accuse clean datasets at more than the rate it advertises.
+- 85,000 simulated datasets: 85 cells (n from 100 to 10,000, true w from 0 to 0.2, minority share 50% down to 1%) x 1,000 replicates, 2x2 tables only. Re-run after the fixes in this branch; detection, adequacy and false-all-clear rates were unchanged in every cell.
+- **False positive rate** (true w = 0) averaged **5.2%** at `alpha = 0.05`, ranging from 0.2% (n=100 with a 1% minority, where the test is conservative) to 6.8%.
+- **Power claims hold.** In all 51 cells where the tool declared itself adequately powered, it detected an effect at or above the SESOI at least 90.3% of the time, above the 80% target.
+- **False all-clears** occurred only when the true effect sat exactly at the SESOI (136 of 15,000 such datasets; at most 3.2% per cell) and never elsewhere. That is the known type-I error of an equivalence test at its boundary (`docs/09` Sec 8).
+- **Not covered:** n above 10,000 and tables larger than 2x2.
+- **Meaning:** When the tool flags a disparity, its error rate stays close to the nominal 5%. Individual cells run up to 6.8% (about 2.5 standard errors above alpha at 1,000 replicates), but the mean over all 20 null cells, 5.2%, is within 1.5 standard errors of 5%, which is what Monte Carlo noise alone would produce.
 
 ## 2. M4 & M6: The "Headline Claim"
 **Hypothesis:** Incumbent tools (AIF360, Fairlearn) certify small-N datasets as "fair" by misinterpreting `p > 0.05` (absence of evidence) as evidence of absence. `dbias` will flag these as "Blind Spots" when statistical power is too low to detect the Smallest Effect Size of Interest (SESOI).
