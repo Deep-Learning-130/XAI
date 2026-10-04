@@ -68,10 +68,23 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def blind_spot_reason(finding) -> str:
+    """One line on why a null result rules nothing out (Cohen's w units)."""
+    mde_w, sesoi = finding.mde_w, finding.sesoi
+    if mde_w is not None and sesoi is not None and mde_w > sesoi:
+        return f"could only have caught w = {mde_w:.3f} or larger"
+    return "powered for the SESOI, but the interval did not rule it out"
+
+
 def _emit(result, out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = write_json(result, out_dir / "audit.json")
-    png_path = plot_coverage_map(result, out_dir / "coverage_map.png")
+    try:
+        png_path = plot_coverage_map(result, out_dir / "coverage_map.png")
+    except ValueError:
+        # No testable cells: there is no map to draw, and that is reported
+        # below rather than crashing after the JSON is already written.
+        png_path = None
 
     blind = [f for f in result.findings if f.severity is Severity.BLIND_SPOT]
     print(f"\n  {len(result.findings)} findings, SESOI = {result.sesoi:g} (Cohen's w)")
@@ -82,15 +95,15 @@ def _emit(result, out_dir: Path) -> None:
     if blind:
         print(f"\n  {len(blind)} blind spot(s) - null results that rule nothing out:")
         for finding in blind:
-            print(
-                f"    {finding.id:<34} could only have caught "
-                f"{finding.minimum_detectable_effect:.3f} or larger"
-            )
+            print(f"    {finding.id:<34} {blind_spot_reason(finding)}")
     else:
         print("\n  No blind spots: every null result here is an earned all-clear.")
 
     print(f"\n  wrote {json_path}")
-    print(f"  wrote {png_path}\n")
+    if png_path is None:
+        print("  no coverage map: the audit produced no testable cells\n")
+    else:
+        print(f"  wrote {png_path}\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -125,7 +138,9 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         frame = pd.read_csv(args.path)
-    except (FileNotFoundError, OSError) as error:
+    except (OSError, ValueError) as error:
+        # ValueError covers pandas' ParserError / EmptyDataError and
+        # UnicodeDecodeError.
         print(f"dbias: cannot read {args.path}: {error}", file=sys.stderr)
         return 2
 

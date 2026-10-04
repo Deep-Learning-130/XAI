@@ -39,7 +39,8 @@ def _magnitude_of(finding: Finding) -> Magnitude:
     is trivial by the user's own definition, and the higher bands follow the
     3x / 5x spacing of Cohen's small/medium/large.
     """
-    sesoi = finding.sesoi
+    # The effect size is Cramer's V; the SESOI is declared as Cohen's w.
+    sesoi = finding.sesoi_v
     if sesoi is None:
         return classify_magnitude(
             finding.effect_size_metric,

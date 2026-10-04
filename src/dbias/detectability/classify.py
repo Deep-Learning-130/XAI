@@ -179,6 +179,7 @@ def annotate_detectability(
     return dataclasses.replace(
         finding,
         sesoi=sesoi,
+        df_min=result.df_min,
         effect_size_ci=effect_size_ci,
         power_to_detect_sesoi=power,
         minimum_detectable_effect=mde_v,

@@ -108,3 +108,10 @@ def test_summary_carries_risk_and_coverage_together():
 def test_empty_input_yields_empty_vectors():
     assert risk_vector([]) == {}
     assert coverage_vector([]) == {}
+
+
+def test_an_adequately_powered_blind_spot_is_not_covered():
+    """Regression: power looked adequate but the interval ruled nothing out.
+    Counting it printed 'risk=Blind Spot coverage=100%'."""
+    findings = [finding(Category.MISSINGNESS, Severity.BLIND_SPOT, Detectability.ADEQUATE)]
+    assert coverage_vector(findings)[Category.MISSINGNESS] == pytest.approx(0.0)

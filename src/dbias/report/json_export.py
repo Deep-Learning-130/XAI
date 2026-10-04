@@ -38,6 +38,27 @@ LIMITATIONS = [
 ]
 
 
+def blind_spot_reading(finding: Finding) -> str:
+    """Why a null result rules nothing out, in the SESOI's own units.
+
+    A blind spot has one of two causes, and saying the wrong one misleads: the
+    test was underpowered, or power looked adequate but the realised interval
+    still did not rule out an effect at the SESOI.
+    """
+    mde_w, sesoi = finding.mde_w, finding.sesoi
+    if mde_w is not None and sesoi is not None and mde_w > sesoi:
+        return (
+            f"No disparity was detected, but this test could only have caught "
+            f"effects of w = {mde_w:.3f} or larger, against a declared SESOI of "
+            f"w = {sesoi:.3f}. This is not a clean result."
+        )
+    return (
+        f"No disparity was detected, and the test was powered for the SESOI "
+        f"(w = {sesoi:.3f}), but the realised interval did not rule out an "
+        f"effect that large. This is not a clean result."
+    )
+
+
 def _finding_to_dict(finding: Finding) -> dict[str, Any]:
     record = asdict(finding)
     record["total_n"] = finding.total_n
@@ -70,6 +91,7 @@ def to_dict(result: AuditResult) -> dict[str, Any]:
                     "attribute": cell.attribute,
                     "feature": cell.feature,
                     "minimum_detectable_effect": cell.mde,
+                    "minimum_detectable_effect_w": cell.mde_w,
                     "detectability": str(cell.detectability),
                     "severity": str(cell.severity),
                     "n": cell.n,
@@ -83,12 +105,7 @@ def to_dict(result: AuditResult) -> dict[str, Any]:
                 "id": f.id,
                 "attribute": f.sensitive_attribute,
                 "feature": f.target_feature,
-                "reading": (
-                    f"No disparity was detected, but this test could only have "
-                    f"caught effects of {f.minimum_detectable_effect:.3f} or "
-                    f"larger, against a declared SESOI of {result.sesoi:.3f}. "
-                    f"This is not a clean result."
-                ),
+                "reading": blind_spot_reading(f),
             }
             for f in blind
         ],

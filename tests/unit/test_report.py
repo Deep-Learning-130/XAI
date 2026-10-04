@@ -101,3 +101,24 @@ def test_plot_rejects_an_audit_with_nothing_to_draw(tmp_path):
     )
     with pytest.raises(ValueError, match="nothing to plot"):
         plot_coverage_map(empty, tmp_path / "coverage.png")
+
+
+def test_blind_spot_reading_names_the_right_cause():
+    """Underpowered: the MDE is the reason. Powered but inconclusive: the MDE
+    is below the SESOI, and saying 'could only have caught X' would claim the
+    test could see the SESOI while calling it a blind spot."""
+    from dbias.models.enums import Category, EffectSizeMetric
+    from dbias.models.finding import Finding
+    from dbias.report.json_export import blind_spot_reading
+
+    def f(mde_v, df_min):
+        return Finding(
+            id="T", category=Category.MISSINGNESS, sensitive_attribute="a",
+            target_feature="x", metric_name="", observed_values={},
+            statistical_test="", p_value_raw=0.5,
+            effect_size_metric=EffectSizeMetric.CRAMERS_V, effect_size_value=0.0,
+            n_per_group={}, sesoi=0.1, df_min=df_min, minimum_detectable_effect=mde_v,
+        )
+
+    assert "could only have caught effects of w = 0.120" in blind_spot_reading(f(0.06, 4))
+    assert "powered for the SESOI" in blind_spot_reading(f(0.085, 1))

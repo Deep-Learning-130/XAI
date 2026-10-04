@@ -81,3 +81,21 @@ def test_demo_reports_its_own_ground_truth(tmp_path):
     truth = json.loads((out / "ground_truth.json").read_text())
     assert truth["true_effects"]["ethnicity"] > 0.1
     assert truth["true_effects"]["gender"] == 0
+
+
+def test_an_audit_with_nothing_testable_does_not_crash(tmp_path):
+    """Regression: plot_coverage_map raised after audit.json was written."""
+    path = tmp_path / "flat.csv"
+    path.write_text("g,y\n" + "a,1\n" * 20)
+    out = tmp_path / "out"
+    code = main(["audit", str(path), "--sensitive", "g", "--sesoi", "0.1", "--out", str(out)])
+    assert code == 0
+    assert (out / "audit.json").exists()
+
+
+def test_a_malformed_csv_is_reported_not_raised(tmp_path, capsys):
+    path = tmp_path / "bad.csv"
+    path.write_bytes(b"\xff\xfe\x00bad")
+    code = main(["audit", str(path), "--sensitive", "g", "--sesoi", "0.1"])
+    assert code == 2
+    assert "cannot read" in capsys.readouterr().err

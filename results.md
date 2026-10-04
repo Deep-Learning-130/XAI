@@ -22,7 +22,7 @@ The M6 gate requires the analyzers to recover the established disparities first:
 ### The "Big-N" Benchmark (Adult N=32,561 & COMPAS N=7,214)
 | Dataset | Findings | Blind spots | High |
 |---|---|---|---|
-| Adult (`run_adult.py`) | 35 | **0** | 3 |
+| Adult (`run_adult.py`) | 35 | **0** | 4 |
 | COMPAS (`run_compas.py`) | 116 | **3** | 3 |
 
 **Adult** has no blind spots at `w=0.1`: at N=32k every test is powered to see an effect of that size.
@@ -31,10 +31,10 @@ The M6 gate requires the analyzers to recover the established disparities first:
 
 These are candidates for the M6 headline cell, but they do not yet meet the gate: the gate requires running the incumbent tool on the cell, and Fairlearn has no test for the distribution of a multi-level categorical feature, so that comparison is still to be designed.
 
-The High findings are representation against a uniform reference (race and sex shares) and, for Adult, relationship by sex (husband/wife); all are expected properties of these datasets.
+The High findings are representation against a uniform reference (race and sex shares) and, for Adult, relationship by sex and by sex + race (husband/wife); all are expected properties of these datasets.
 
 ### The "Small-N" Simulation (Subsampled Adult, N=500)
-**Result** (`run_subsampled.py`): **19 blind spots** out of 41 findings.
+**Result** (`run_subsampled.py`): **19 blind spots** out of 41 findings, and 12 High.
 - 4 missingness (MAR): `workclass`, `occupation` and `native-country` by race; `native-country` by sex.
 - 10 feature disparity: e.g. `education`, `workclass`, `occupation` and `capital-loss` by sex or race.
 - 5 intersectional (`sex + race`), skipped by power-guided descent (Section 3).
@@ -61,6 +61,8 @@ Conclusion dbias draws: 'BLIND SPOT. You do not have the power to claim this is 
 **Meaning:** A `p > 0.05`, or a difference reported without power bounds, does not show a dataset is fair. The sample was too small to rule out an effect as large as 0.207, and `dbias` refuses the false certification.
 
 **Caveat on the intervals.** For several sparse feature tables the bootstrap interval on Cramér's V sits *above* the SESOI even though the test is not significant (e.g. `DISP_OCCUPATION_RACE`: V = 0.157, CI [0.170, 0.287]). Near the null, V is biased upward and the percentile bootstrap inherits that bias, so the lower bound carries no inference (see `stats/intervals.py`). These findings are correctly scored as blind spots — the interval did not rule out the SESOI — but their intervals should not be read as evidence *of* a disparity. A bias-corrected interval is future work.
+
+**Caveat on magnitudes.** The same upward bias inflates the *point* estimate of V on sparse tables, so severity grades there run high. Of the 12 High findings at N=500, several are large tables such as `education` x `sex + race` (16 x 10 cells over 500 rows), where V would be about 0.17 with no association at all. On the full dataset `education` by race measures V = 0.075 (Low) against V = 0.265 (High) at N=500, and `education` by sex + race 0.062 against 0.234. (`native-country` appears only at N=500 because the full data has more than 20 countries, above the analyzer's level cap.) A bias-corrected V (Bergsma 2013) would fix both caveats, but it changes every effect size the tool reports and has not been adopted yet.
 
 ## 3. M7: Intersectional Gating (Partial)
 **Hypothesis:** Intersectional subgroups (e.g., "Black Females") suffer from sample size collapse. Testing all intersections blindly inflates the number of hypotheses and wastes compute on tests that cannot reach adequate power.

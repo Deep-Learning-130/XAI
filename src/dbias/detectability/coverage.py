@@ -21,12 +21,30 @@ from dbias.models.finding import Finding
 # attribute itself -- but it still earns a column on the grid.
 REPRESENTATION_COLUMN = "(representation)"
 
+# Several categories can test the same column -- missingness of `workclass`
+# and the distribution of `workclass` are different hypotheses -- so every
+# category but missingness tags its column, and no cell overwrites another.
+_COLUMN_SUFFIX = {
+    Category.LABEL_DISPARITY: " (label)",
+    Category.FEATURE_DISPARITY: " (distribution)",
+}
+
+
+def column_for(finding: Finding) -> str:
+    """The grid column a finding occupies."""
+    if finding.category is Category.REPRESENTATION or finding.target_feature is None:
+        return REPRESENTATION_COLUMN
+    return finding.target_feature + _COLUMN_SUFFIX.get(finding.category, "")
+
 
 @dataclass(frozen=True)
 class CoverageCell:
     attribute: str
     feature: str
     mde: float | None
+    # The MDE on the SESOI's (Cohen's w) scale, so cells of different table
+    # shapes can be compared with one declared SESOI.
+    mde_w: float | None
     detectability: Detectability
     severity: Severity
     n: int
@@ -44,24 +62,24 @@ class CoverageMap:
         return self.cells.get((attribute, feature))
 
     def matrix(self) -> np.ndarray:
-        """MDE per cell, NaN where the pair was never tested."""
+        """MDE per cell on the Cohen's w scale, NaN where never tested."""
         out = np.full((len(self.attributes), len(self.features)), np.nan)
         for row, attribute in enumerate(self.attributes):
             for col, feature in enumerate(self.features):
                 found = self.cells.get((attribute, feature))
-                if found is not None and found.mde is not None:
-                    out[row, col] = found.mde
+                if found is not None and found.mde_w is not None:
+                    out[row, col] = found.mde_w
         return out
 
     def blind_spots(self) -> list[CoverageCell]:
         return [c for c in self.cells.values() if c.severity is Severity.BLIND_SPOT]
 
     def worst_mde(self, attribute: str) -> float | None:
-        """Largest MDE across an attribute's row -- its weakest cell."""
+        """Largest MDE (Cohen's w) across an attribute's row -- its weakest cell."""
         values = [
-            c.mde
+            c.mde_w
             for (a, _), c in self.cells.items()
-            if a == attribute and c.mde is not None
+            if a == attribute and c.mde_w is not None
         ]
         return max(values) if values else None
 
@@ -69,16 +87,13 @@ class CoverageMap:
 def coverage_map(findings: Iterable[Finding]) -> CoverageMap:
     cells: dict[tuple[str, str], CoverageCell] = {}
     for finding in findings:
-        feature = (
-            REPRESENTATION_COLUMN
-            if finding.category is Category.REPRESENTATION or finding.target_feature is None
-            else finding.target_feature
-        )
+        feature = column_for(finding)
         key = (finding.sensitive_attribute, feature)
         cells[key] = CoverageCell(
             attribute=finding.sensitive_attribute,
             feature=feature,
             mde=finding.minimum_detectable_effect,
+            mde_w=finding.mde_w,
             detectability=finding.detectability,
             severity=finding.severity,
             n=finding.total_n,

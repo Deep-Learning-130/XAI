@@ -5,7 +5,8 @@ the value at many times the cost, and this image is the one artifact that
 makes the idea legible without reading anything (plan.md Sec 4).
 
 Reading the figure: each cell is the smallest effect that pair could have
-detected. Cells at or below the declared SESOI are shaded cool -- the audit
+detected, on the Cohen's w scale the SESOI is declared on -- converting from
+Cramer's V per table shape, so one SESOI line serves every cell. Cells at or below the declared SESOI are shaded cool -- the audit
 was entitled to speak about them. Cells above it are shaded warm and hatched:
 whatever the p-value said, that pair could not have caught an effect the user
 declared they care about. A hatched cell with no finding is not a clean cell.
@@ -59,7 +60,7 @@ def plot_coverage_map(
     for row, attribute in enumerate(grid.attributes):
         for col, feature in enumerate(grid.features):
             cell = grid.cell(attribute, feature)
-            if cell is None or cell.mde is None:
+            if cell is None or cell.mde_w is None:
                 ax.text(col, row, "not\ntested", ha="center", va="center",
                         fontsize=7.5, color="0.45", style="italic")
                 continue
@@ -73,7 +74,7 @@ def plot_coverage_map(
                         fill=False, hatch="////", edgecolor="black", linewidth=1.8,
                     )
                 )
-            label = f"{cell.mde:.3f}{'*' if cell.approximate else ''}"
+            label = f"{cell.mde_w:.3f}{'*' if cell.approximate else ''}"
             ax.text(
                 col, row + 0.06, label, ha="center", va="center",
                 fontsize=10.5, fontweight="bold" if blind else "normal", color="black",
@@ -88,7 +89,7 @@ def plot_coverage_map(
             )
 
     bar = fig.colorbar(image, ax=ax, shrink=0.9, pad=0.02)
-    bar.set_label("minimum detectable effect (Cramer's V)")
+    bar.set_label("minimum detectable effect (Cohen's w)")
     bar.ax.axhline(sesoi, color="black", linewidth=1.8)
     bar.ax.text(0.5, sesoi, "SESOI", va="bottom", ha="center", fontsize=7.5,
                 fontweight="bold", transform=bar.ax.get_yaxis_transform())
