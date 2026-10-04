@@ -22,7 +22,8 @@ def main():
         df=df,
         sensitive_cols=sensitive_attrs,
         target_col="is_recid",
-        sesoi=0.1
+        sesoi=0.1,
+        seed=0,
     )
     
     print(f"Audit complete. Found {len(result.findings)} total findings.")

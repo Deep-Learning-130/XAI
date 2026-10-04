@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from dbias.stats.effect_sizes import v_from_w, w_from_v
 from dbias.models.enums import (
     Category,
     Detectability,
@@ -45,7 +46,11 @@ class Finding:
 
     # What could have been found -- populated by detectability/
     effect_size_ci: tuple[float, float] | None = None
+    # `sesoi` is declared on the Cohen's w scale; the effect size, interval and
+    # MDE are on the Cramer's V scale. V = w / sqrt(df_min), so this is what
+    # any comparison between the two needs.
     sesoi: float | None = None
+    df_min: int | None = None
     power_to_detect_sesoi: float | None = None
     minimum_detectable_effect: float | None = None
     mde_is_approximate: bool = False
@@ -63,3 +68,17 @@ class Finding:
     @property
     def total_n(self) -> int:
         return sum(self.n_per_group.values())
+
+    @property
+    def sesoi_v(self) -> float | None:
+        """The SESOI on the effect size's own (Cramer's V) scale."""
+        if self.sesoi is None:
+            return None
+        return v_from_w(self.sesoi, self.df_min or 1)
+
+    @property
+    def mde_w(self) -> float | None:
+        """The MDE on the SESOI's (Cohen's w) scale."""
+        if self.minimum_detectable_effect is None:
+            return None
+        return w_from_v(self.minimum_detectable_effect, self.df_min or 1)

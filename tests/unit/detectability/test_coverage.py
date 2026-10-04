@@ -85,7 +85,7 @@ def test_untested_cells_are_nan_in_the_matrix():
 
     grid = coverage_map(FINDINGS)
     row = grid.attributes.index("gender")
-    col = grid.features.index("hired")
+    col = grid.features.index("hired (label)")
     assert np.isnan(grid.matrix()[row, col])
 
 
@@ -93,7 +93,7 @@ def test_blind_spot_cells_are_enumerable():
     blind = coverage_map(FINDINGS).blind_spots()
     assert {(c.attribute, c.feature) for c in blind} == {
         ("ethnicity", "income"),
-        ("ethnicity", "hired"),
+        ("ethnicity", "hired (label)"),
     }
 
 
@@ -113,3 +113,33 @@ def test_empty_findings_give_an_empty_map():
     grid = coverage_map([])
     assert grid.attributes == []
     assert grid.features == []
+
+
+def test_two_categories_on_one_feature_get_separate_cells():
+    """Regression: MAR_WORKCLASS_RACE and DISP_WORKCLASS_RACE shared a key, so
+    whichever came second silently erased the other -- blind spots included."""
+    findings = [
+        finding("race", "workclass", Category.MISSINGNESS, 0.2,
+                Detectability.UNDERPOWERED, Severity.BLIND_SPOT),
+        finding("race", "workclass", Category.FEATURE_DISPARITY, 0.05,
+                Detectability.ADEQUATE, Severity.INFORMATIONAL),
+    ]
+    grid = coverage_map(findings)
+    assert grid.cell("race", "workclass").severity is Severity.BLIND_SPOT
+    assert grid.cell("race", "workclass (distribution)").severity is Severity.INFORMATIONAL
+
+
+def test_cells_are_drawn_on_the_sesois_scale():
+    """MDE is stored as Cramer's V; the SESOI is Cohen's w. A 5-group table
+    (df_min = 4) with MDE_V = 0.06 cannot see w = 0.1: its MDE_w is 0.12."""
+    import dataclasses
+
+    wide = dataclasses.replace(
+        finding("race", "occupation", Category.FEATURE_DISPARITY, 0.06,
+                Detectability.UNDERPOWERED, Severity.BLIND_SPOT),
+        df_min=4,
+    )
+    cell = coverage_map([wide]).cell("race", "occupation (distribution)")
+    assert cell.mde == pytest.approx(0.06)
+    assert cell.mde_w == pytest.approx(0.12)
+    assert coverage_map([wide]).matrix()[0, 0] == pytest.approx(0.12)

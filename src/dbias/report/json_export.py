@@ -19,7 +19,7 @@ from typing import Any
 
 from dbias.audit import AuditResult
 from dbias.detectability.coverage import coverage_map
-from dbias.models.enums import Severity
+from dbias.models.enums import Detectability, Severity
 from dbias.models.finding import Finding
 
 LIMITATIONS = [
@@ -36,6 +36,36 @@ LIMITATIONS = [
     "This tool audits data. It does not audit models, and a clean dataset "
     "does not imply a fair model.",
 ]
+
+
+def blind_spot_reading(finding: Finding) -> str:
+    """Why a null result rules nothing out, in the SESOI's own units.
+
+    A blind spot has one of two causes, and saying the wrong one misleads: the
+    test was underpowered, or power looked adequate but the realised interval
+    still did not rule out an effect at the SESOI.
+    """
+    return f"No disparity was detected, but {blind_spot_reason(finding)}. This is not a clean result."
+
+
+def blind_spot_reason(finding: Finding) -> str:
+    """The cause clause of :func:`blind_spot_reading`, also used by the CLI.
+
+    The cause is read from `detectability`, which is what decided it -- not
+    re-derived from the MDE, which on the simulated 2x2 path comes from a
+    separate Monte Carlo search and can disagree with the power by a hair.
+    """
+    sesoi = "the SESOI" if finding.sesoi is None else f"the SESOI (w = {finding.sesoi:.3f})"
+    if finding.detectability is Detectability.UNDERPOWERED:
+        mde_w = finding.mde_w
+        reach = "" if mde_w is None else f"; it could only have caught w = {mde_w:.3f} or larger"
+        return f"the test was not powered to detect {sesoi}{reach}"
+    if finding.effect_size_ci is None:
+        return f"no interval was computed, so {sesoi} was not ruled out"
+    return (
+        f"although the test was powered for {sesoi}, the realised interval "
+        f"did not rule out an effect that large"
+    )
 
 
 def _finding_to_dict(finding: Finding) -> dict[str, Any]:
@@ -70,6 +100,7 @@ def to_dict(result: AuditResult) -> dict[str, Any]:
                     "attribute": cell.attribute,
                     "feature": cell.feature,
                     "minimum_detectable_effect": cell.mde,
+                    "minimum_detectable_effect_w": cell.mde_w,
                     "detectability": str(cell.detectability),
                     "severity": str(cell.severity),
                     "n": cell.n,
@@ -83,12 +114,7 @@ def to_dict(result: AuditResult) -> dict[str, Any]:
                 "id": f.id,
                 "attribute": f.sensitive_attribute,
                 "feature": f.target_feature,
-                "reading": (
-                    f"No disparity was detected, but this test could only have "
-                    f"caught effects of {f.minimum_detectable_effect:.3f} or "
-                    f"larger, against a declared SESOI of {result.sesoi:.3f}. "
-                    f"This is not a clean result."
-                ),
+                "reading": blind_spot_reading(f),
             }
             for f in blind
         ],

@@ -27,7 +27,8 @@ def main():
         df=df,
         sensitive_cols=sensitive_attrs,
         target_col="income",
-        sesoi=0.1
+        sesoi=0.1,
+        seed=0,
     )
     
     print(f"Audit complete. Found {len(result.findings)} total findings.")
@@ -36,7 +37,12 @@ def main():
     print(f"Found {len(blind_spots)} blind spots out of {len(result.findings)} tests!")
     
     for bs in blind_spots:
-        print(f" - BLIND SPOT: {bs.id} (Category: {bs.category.name}, CI: [{bs.effect_size_ci[0]:.3f}, {bs.effect_size_ci[1]:.3f}])")
+        ci = (
+            f"[{bs.effect_size_ci[0]:.3f}, {bs.effect_size_ci[1]:.3f}]"
+            if bs.effect_size_ci is not None
+            else "not computed (underpowered intersection)"
+        )
+        print(f" - BLIND SPOT: {bs.id} (Category: {bs.category.name}, CI: {ci})")
         
     write_json(result, "subsampled_audit.json")
     print("Exported to subsampled_audit.json")

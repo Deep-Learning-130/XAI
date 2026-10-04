@@ -27,16 +27,28 @@ class RepresentationAnalyzer(BaseAnalyzer):
         out: list[Hypothesis] = []
         for attribute in sensitive_cols:
             counts = df[attribute].value_counts(dropna=True)
-            if len(counts) < 2:
-                # A constant attribute has no shares to compare.
-                continue
-
             reference = self.reference.get(attribute)
-            expected_probs = (
-                tuple(reference[str(level)] for level in counts.index)
-                if reference
-                else None
-            )
+            expected_probs = None
+            if reference:
+                observed = {str(level) for level in counts.index}
+                expected = [level for level, share in reference.items() if share > 0]
+                unknown = sorted(observed - set(expected))
+                if unknown:
+                    raise ValueError(
+                        f"reference for {attribute!r} gives no positive share to "
+                        f"observed level(s) {unknown}"
+                    )
+                # A group the reference expects but the data lacks is the most
+                # extreme under-representation there is; it is counted as zero,
+                # never dropped. A level the reference gives no share is not
+                # expected at all, so it is not a group here.
+                counts.index = counts.index.map(str)
+                counts = counts.reindex(expected, fill_value=0)
+                expected_probs = tuple(float(reference[level]) for level in counts.index)
+
+            if len(counts) < 2 or counts.sum() == 0:
+                # A constant or empty attribute has no shares to compare.
+                continue
             result = chi_square_goodness_of_fit(counts.to_numpy(), expected_probs)
             total = int(counts.sum())
 

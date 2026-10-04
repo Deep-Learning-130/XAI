@@ -39,7 +39,8 @@ def _magnitude_of(finding: Finding) -> Magnitude:
     is trivial by the user's own definition, and the higher bands follow the
     3x / 5x spacing of Cohen's small/medium/large.
     """
-    sesoi = finding.sesoi
+    # The effect size is Cramer's V; the SESOI is declared as Cohen's w.
+    sesoi = finding.sesoi_v
     if sesoi is None:
         return classify_magnitude(
             finding.effect_size_metric,
@@ -68,12 +69,18 @@ def _null_result_severity(finding: Finding) -> Severity:
     test the power calculation pessimistically wrote off, and it can withdraw
     an adequacy the power calculation promised.
 
+    Only EQUIVALENT earns the all-clear. A non-significant finding whose
+    interval sits above the SESOI (DISPARITY) has not ruled the SESOI out
+    either -- near the null the bootstrap interval on V is biased upward and
+    its lower bound carries no inference (stats/intervals.py) -- so it is a
+    blind spot, never an all-clear on the strength of the power calculation.
+
     `detectability` is the fallback for metrics with no interval, and remains
     what the coverage map reports.
     """
     if finding.equivalence_verdict is EquivalenceVerdict.EQUIVALENT:
         return Severity.INFORMATIONAL
-    if finding.equivalence_verdict is EquivalenceVerdict.INCONCLUSIVE:
+    if finding.equivalence_verdict is not None:
         return Severity.BLIND_SPOT
     if finding.detectability is Detectability.ADEQUATE:
         return Severity.INFORMATIONAL

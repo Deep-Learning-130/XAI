@@ -43,7 +43,13 @@ def risk_vector(findings: Iterable[Finding]) -> dict[Category, Severity]:
 
 
 def coverage_vector(findings: Iterable[Finding]) -> dict[Category, float]:
-    """Share of each category's testable cells that were adequately powered.
+    """Share of each category's testable cells the audit can speak about.
+
+    A cell counts unless it is a blind spot. The interval outranks the power
+    calculation in both directions (rules/severity.py): a cell whose power
+    looked adequate but whose interval ruled nothing out is not covered --
+    counting it would print "coverage=100%" beside a blind spot -- and an
+    underpowered cell whose interval still earned an all-clear is.
 
     Cells with no rows are excluded from both numerator and denominator: they
     were never hypotheses, so they neither demonstrate nor undermine coverage.
@@ -54,7 +60,7 @@ def coverage_vector(findings: Iterable[Finding]) -> dict[Category, float]:
         if finding.detectability is Detectability.EMPTY:
             continue
         total[finding.category] = total.get(finding.category, 0) + 1
-        if finding.detectability is Detectability.ADEQUATE:
+        if finding.severity is not Severity.BLIND_SPOT:
             seen[finding.category] = seen.get(finding.category, 0) + 1
     return {
         category: seen.get(category, 0) / count for category, count in total.items()

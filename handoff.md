@@ -3,7 +3,7 @@
 Everything needed to pick this project up cold. If you are an agent or a developer arriving with no context, read this file top to bottom, then [plan.md](plan.md) §3, then start at the section "Where to start" below.
 
 **Last updated:** 2026-08-20
-**Repository state:** a working vertical slice. `src/dbias/` is installable, `dbias demo` runs end to end, and 193 tests pass in ~35 s. The full **M3 calibration gate** has passed and the simulation-based MDE fallback for 2x2 tables is implemented. See §2b for exactly what exists and §2c for what does not.
+**Repository state:** a working vertical slice. `src/dbias/` is installable, `dbias demo` runs end to end, and 237 tests pass. The **M3 calibration gate** has passed for 2x2 tables and the simulation-based MDE fallback for 2x2 tables is implemented. See §2b for exactly what exists and §2c for what does not.
 
 ---
 
@@ -148,8 +148,11 @@ execute Tasks 1–6 — are done.
 
 **Do these in order. The first two are the project; the rest is polish.**
 
-**1. Run the full M3 calibration gate (roadmap M3, ~1 week). [DONE]** The full experiment
-ran over 100,000 datasets and verified the empirical power matches predictions, passing the gate.
+**1. Run the full M3 calibration gate (roadmap M3, ~1 week). [DONE for 2x2]**
+`tests/calibration/run_m3_gate.py` ran 85,000 simulated datasets (85 cells x 1,000
+replicates; n in {100 ... 10,000}, minority share down to 1%, 2x2 tables only).
+The false positive rate held near alpha; see `results.md` Sec 1. Still outstanding
+from the original spec: n up to 100,000 and tables larger than 2x2.
 
 **2. Build the simulation-based MDE (plan.md §3.4). [DONE for 2x2]**
 The simulation-based fallback drops into `detectability/power.py` and is fully integrated for 2x2 tables.
