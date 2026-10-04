@@ -157,7 +157,16 @@ def test_a_reference_group_absent_from_the_data_is_counted_as_zero():
     assert h.sample.expected_probs == (0.5, 0.3, 0.2)
 
 
+def test_a_zero_share_reference_level_is_not_a_group():
+    """Regression: reindexing to every reference level passed a 0 expected
+    share to the goodness-of-fit test, which rejects it."""
+    df = pd.DataFrame({"race": ["A"] * 60 + ["B"] * 40})
+    reference = {"race": {"A": 0.6, "B": 0.4, "C": 0.0}}
+    [h] = RepresentationAnalyzer(reference).analyze(df, ["race"])
+    assert h.finding.n_per_group == {"A": 60, "B": 40}
+
+
 def test_an_observed_level_missing_from_the_reference_is_a_clear_error():
     df = pd.DataFrame({"race": ["A"] * 60 + ["D"] * 40})
-    with pytest.raises(ValueError, match="no share for observed"):
+    with pytest.raises(ValueError, match="no positive share"):
         RepresentationAnalyzer({"race": {"A": 0.5, "B": 0.5}}).analyze(df, ["race"])

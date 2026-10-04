@@ -19,7 +19,7 @@ from typing import Any
 
 from dbias.audit import AuditResult
 from dbias.detectability.coverage import coverage_map
-from dbias.models.enums import Severity
+from dbias.models.enums import Detectability, Severity
 from dbias.models.finding import Finding
 
 LIMITATIONS = [
@@ -45,17 +45,26 @@ def blind_spot_reading(finding: Finding) -> str:
     test was underpowered, or power looked adequate but the realised interval
     still did not rule out an effect at the SESOI.
     """
-    mde_w, sesoi = finding.mde_w, finding.sesoi
-    if mde_w is not None and sesoi is not None and mde_w > sesoi:
-        return (
-            f"No disparity was detected, but this test could only have caught "
-            f"effects of w = {mde_w:.3f} or larger, against a declared SESOI of "
-            f"w = {sesoi:.3f}. This is not a clean result."
-        )
+    return f"No disparity was detected, but {blind_spot_reason(finding)}. This is not a clean result."
+
+
+def blind_spot_reason(finding: Finding) -> str:
+    """The cause clause of :func:`blind_spot_reading`, also used by the CLI.
+
+    The cause is read from `detectability`, which is what decided it -- not
+    re-derived from the MDE, which on the simulated 2x2 path comes from a
+    separate Monte Carlo search and can disagree with the power by a hair.
+    """
+    sesoi = "the SESOI" if finding.sesoi is None else f"the SESOI (w = {finding.sesoi:.3f})"
+    if finding.detectability is Detectability.UNDERPOWERED:
+        mde_w = finding.mde_w
+        reach = "" if mde_w is None else f"; it could only have caught w = {mde_w:.3f} or larger"
+        return f"the test was not powered to detect {sesoi}{reach}"
+    if finding.effect_size_ci is None:
+        return f"no interval was computed, so {sesoi} was not ruled out"
     return (
-        f"No disparity was detected, and the test was powered for the SESOI "
-        f"(w = {sesoi:.3f}), but the realised interval did not rule out an "
-        f"effect that large. This is not a clean result."
+        f"although the test was powered for {sesoi}, the realised interval "
+        f"did not rule out an effect that large"
     )
 
 

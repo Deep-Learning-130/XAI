@@ -31,17 +31,19 @@ class RepresentationAnalyzer(BaseAnalyzer):
             expected_probs = None
             if reference:
                 observed = {str(level) for level in counts.index}
-                unknown = sorted(observed - set(reference))
+                expected = [level for level, share in reference.items() if share > 0]
+                unknown = sorted(observed - set(expected))
                 if unknown:
                     raise ValueError(
-                        f"reference for {attribute!r} has no share for observed "
-                        f"level(s) {unknown}"
+                        f"reference for {attribute!r} gives no positive share to "
+                        f"observed level(s) {unknown}"
                     )
                 # A group the reference expects but the data lacks is the most
                 # extreme under-representation there is; it is counted as zero,
-                # never dropped.
+                # never dropped. A level the reference gives no share is not
+                # expected at all, so it is not a group here.
                 counts.index = counts.index.map(str)
-                counts = counts.reindex(list(reference), fill_value=0)
+                counts = counts.reindex(expected, fill_value=0)
                 expected_probs = tuple(float(reference[level]) for level in counts.index)
 
             if len(counts) < 2 or counts.sum() == 0:

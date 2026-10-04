@@ -17,9 +17,10 @@ from pathlib import Path
 import pandas as pd
 
 from dbias.audit import audit
+from dbias.detectability.coverage import coverage_map
 from dbias.models.enums import Severity
 from dbias.report.coverage_plot import plot_coverage_map
-from dbias.report.json_export import write_json
+from dbias.report.json_export import blind_spot_reason, write_json
 from dbias.synthetic import make_audit_scenario
 
 DEMO_SEED = 1
@@ -68,23 +69,17 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def blind_spot_reason(finding) -> str:
-    """One line on why a null result rules nothing out (Cohen's w units)."""
-    mde_w, sesoi = finding.mde_w, finding.sesoi
-    if mde_w is not None and sesoi is not None and mde_w > sesoi:
-        return f"could only have caught w = {mde_w:.3f} or larger"
-    return "powered for the SESOI, but the interval did not rule it out"
-
-
 def _emit(result, out_dir: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = write_json(result, out_dir / "audit.json")
-    try:
-        png_path = plot_coverage_map(result, out_dir / "coverage_map.png")
-    except ValueError:
-        # No testable cells: there is no map to draw, and that is reported
-        # below rather than crashing after the JSON is already written.
-        png_path = None
+    grid = coverage_map(result.findings)
+    # No testable cells: there is no map to draw, and that is reported below
+    # rather than crashing after the JSON is already written.
+    png_path = (
+        plot_coverage_map(result, out_dir / "coverage_map.png")
+        if grid.attributes and grid.features
+        else None
+    )
 
     blind = [f for f in result.findings if f.severity is Severity.BLIND_SPOT]
     print(f"\n  {len(result.findings)} findings, SESOI = {result.sesoi:g} (Cohen's w)")

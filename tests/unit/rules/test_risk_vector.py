@@ -115,3 +115,9 @@ def test_an_adequately_powered_blind_spot_is_not_covered():
     Counting it printed 'risk=Blind Spot coverage=100%'."""
     findings = [finding(Category.MISSINGNESS, Severity.BLIND_SPOT, Detectability.ADEQUATE)]
     assert coverage_vector(findings)[Category.MISSINGNESS] == pytest.approx(0.0)
+
+
+def test_an_underpowered_cell_whose_interval_earned_an_all_clear_is_covered():
+    """The interval outranks the power calculation in both directions."""
+    findings = [finding(Category.MISSINGNESS, Severity.INFORMATIONAL, Detectability.UNDERPOWERED)]
+    assert coverage_vector(findings)[Category.MISSINGNESS] == pytest.approx(1.0)

@@ -7,6 +7,7 @@ from fairlearn.metrics import MetricFrame, demographic_parity_difference
 
 from dbias.ingestion.loaders import fetch_adult
 from dbias.audit import audit
+from dbias.report.json_export import blind_spot_reading
 
 def main():
     print("Fetching Adult dataset and subsampling to N=500...")
@@ -58,7 +59,7 @@ def main():
             print("Confidence Interval for Effect Size: not computed")
         print(f"Verdict: {finding.equivalence_verdict}")
         if finding.severity.name == "BLIND_SPOT":
-            print("Conclusion dbias draws: 'BLIND SPOT. You do not have the power to claim this is fair. The CI straddles the SESOI of 0.1.'")
+            print(f"Conclusion dbias draws: 'BLIND SPOT. {blind_spot_reading(finding)}'")
     else:
         print("Finding not found! Available findings:")
         for f in result.findings:

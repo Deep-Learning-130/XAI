@@ -16,6 +16,7 @@ import numpy as np
 
 from dbias.models.enums import Category, Detectability, Severity
 from dbias.models.finding import Finding
+from dbias.stats.effect_sizes import w_from_v
 
 # Representation has no target feature -- it is a statement about the
 # attribute itself -- but it still earns a column on the grid.
@@ -41,15 +42,19 @@ def column_for(finding: Finding) -> str:
 class CoverageCell:
     attribute: str
     feature: str
-    mde: float | None
-    # The MDE on the SESOI's (Cohen's w) scale, so cells of different table
-    # shapes can be compared with one declared SESOI.
-    mde_w: float | None
+    mde: float | None  # Cramer's V, as on the finding
+    df_min: int | None
     detectability: Detectability
     severity: Severity
     n: int
     approximate: bool
     finding_id: str
+
+    @property
+    def mde_w(self) -> float | None:
+        """The MDE on the SESOI's (Cohen's w) scale, so cells of different
+        table shapes can be compared against one declared SESOI."""
+        return None if self.mde is None else w_from_v(self.mde, self.df_min or 1)
 
 
 @dataclass(frozen=True)
@@ -93,7 +98,7 @@ def coverage_map(findings: Iterable[Finding]) -> CoverageMap:
             attribute=finding.sensitive_attribute,
             feature=feature,
             mde=finding.minimum_detectable_effect,
-            mde_w=finding.mde_w,
+            df_min=finding.df_min,
             detectability=finding.detectability,
             severity=finding.severity,
             n=finding.total_n,

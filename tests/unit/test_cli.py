@@ -93,6 +93,22 @@ def test_an_audit_with_nothing_testable_does_not_crash(tmp_path):
     assert (out / "audit.json").exists()
 
 
+def test_a_plotting_failure_is_not_mistaken_for_an_empty_audit(csv_path, tmp_path, monkeypatch):
+    """Only 'no testable cells' means no map; any other plotting error must
+    surface rather than be reported as an empty audit."""
+    import dbias.cli as cli
+
+    def broken(*args, **kwargs):
+        raise ValueError("Image size is too large")
+
+    monkeypatch.setattr(cli, "plot_coverage_map", broken)
+    with pytest.raises(ValueError, match="too large"):
+        main([
+            "audit", str(csv_path), "--sensitive", "gender", "--target", "hired",
+            "--sesoi", "0.1", "--out", str(tmp_path / "out"), "--resamples", "50",
+        ])
+
+
 def test_a_malformed_csv_is_reported_not_raised(tmp_path, capsys):
     path = tmp_path / "bad.csv"
     path.write_bytes(b"\xff\xfe\x00bad")

@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from dbias.stats.effect_sizes import v_from_w, w_from_v
 from dbias.models.enums import (
     Category,
     Detectability,
@@ -73,11 +74,11 @@ class Finding:
         """The SESOI on the effect size's own (Cramer's V) scale."""
         if self.sesoi is None:
             return None
-        return self.sesoi / (self.df_min or 1) ** 0.5
+        return v_from_w(self.sesoi, self.df_min or 1)
 
     @property
     def mde_w(self) -> float | None:
         """The MDE on the SESOI's (Cohen's w) scale."""
         if self.minimum_detectable_effect is None:
             return None
-        return self.minimum_detectable_effect * (self.df_min or 1) ** 0.5
+        return w_from_v(self.minimum_detectable_effect, self.df_min or 1)
