@@ -41,6 +41,9 @@ from dbias.stats.intervals import (
     bootstrap_ci_gof_w,
 )
 
+# Seed for the 2x2 power simulation when the caller gives none.
+_SIMULATION_SEED = 0
+
 
 def _measure(sample: ArrayLike | GofSample):
     """Return (ChiSquareResult, total_n, interval_function) for either sample kind."""
@@ -113,17 +116,20 @@ def annotate_detectability(
         table = np.asarray(sample, dtype=float)
         row_sums = table.sum(axis=1)
         col_sums = table.sum(axis=0)
-        
+
         minority_share = float(row_sums.min() / result.n)
         base_rate = float(col_sums[0] / result.n)
-        
+        # The simulation must not make the verdict vary between runs, so it
+        # never draws from fresh entropy even when the caller passes no seed.
+        sim_seed = _SIMULATION_SEED if seed is None else seed
+
         power = simulate_power_2x2(
-            w=sesoi, 
-            n=result.n, 
-            minority_share=minority_share, 
-            base_rate=base_rate, 
+            w=sesoi,
+            n=result.n,
+            minority_share=minority_share,
+            base_rate=base_rate,
             alpha=alpha,
-            seed=seed
+            seed=sim_seed,
         )
         mde_v = simulate_mde_2x2(
             n=result.n,
@@ -131,10 +137,13 @@ def annotate_detectability(
             base_rate=base_rate,
             alpha=alpha,
             target_power=target_power,
-            seed=seed
+            seed=sim_seed,
         ) / np.sqrt(result.df_min)  # convert back to Cramer's V scale
-        
-        used_approximation = False # we just fixed it
+
+        # The simulation runs the same uncorrected chi-square the audit runs,
+        # so its power is the power of the test actually performed, up to
+        # Monte Carlo error -- not the marginal-blind n * w^2 approximation.
+        used_approximation = False
     else:
         power = power_chi_square(w=sesoi, n=result.n, dof=result.dof, alpha=alpha)
         mde_v = mde_cramers_v(
@@ -145,12 +154,20 @@ def annotate_detectability(
             target_power=target_power,
         )
 
-    if skip_interval:
-        # Power-guided descent: skip expensive bootstrap if parent was underpowered
-        ci_lo, ci_hi = 0.0, 1.0
-        verdict = EquivalenceVerdict.INCONCLUSIVE
+    detectability = (
+        Detectability.ADEQUATE if power >= target_power else Detectability.UNDERPOWERED
+    )
+
+    if skip_interval and detectability is Detectability.UNDERPOWERED:
+        # Power-guided descent: the parent was underpowered and so is this
+        # cell, so the bootstrap is skipped. No interval was computed, so none
+        # is reported and there is no verdict; rules/ falls back to
+        # detectability, which reads an underpowered null as a blind spot.
+        effect_size_ci = None
+        verdict = None
     else:
         ci_lo, ci_hi = interval(n_resamples, 1.0 - alpha, seed)
+        effect_size_ci = (ci_lo, ci_hi)
 
         if ci_hi < sesoi_v:
             verdict = EquivalenceVerdict.EQUIVALENT
@@ -159,14 +176,10 @@ def annotate_detectability(
         else:
             verdict = EquivalenceVerdict.INCONCLUSIVE
 
-    detectability = (
-        Detectability.ADEQUATE if power >= target_power else Detectability.UNDERPOWERED
-    )
-
     return dataclasses.replace(
         finding,
         sesoi=sesoi,
-        effect_size_ci=(ci_lo, ci_hi),
+        effect_size_ci=effect_size_ci,
         power_to_detect_sesoi=power,
         minimum_detectable_effect=mde_v,
         mde_is_approximate=used_approximation,

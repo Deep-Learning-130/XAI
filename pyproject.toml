@@ -19,6 +19,10 @@ dev = [
     "pytest>=8.0",
     "statsmodels>=0.14",
 ]
+# Only for compare_fairlearn.py.
+bench = [
+    "fairlearn>=0.10",
+]
 
 [project.scripts]
 dbias = "dbias.cli:main"

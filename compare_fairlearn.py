@@ -1,8 +1,9 @@
-"""Direct comparison between Fairlearn and dbias on the small-N benchmark."""
+"""Direct comparison between Fairlearn and dbias on the small-N benchmark.
 
-import pandas as pd
+Needs the optional benchmark extra: pip install -e .[bench]
+"""
+
 from fairlearn.metrics import MetricFrame, demographic_parity_difference
-from sklearn.metrics import accuracy_score
 
 from dbias.ingestion.loaders import fetch_adult
 from dbias.audit import audit
@@ -34,7 +35,7 @@ def main():
         sensitive_features=df['race']
     )
     print(f"\nDemographic Parity Difference: {dp_diff:.3f}")
-    print("Conclusion a practitioner draws: 'The maximum difference in missingness rates is 16.6%. The groups are small, so it's not statistically significant. We pass the fairness check!'")
+    print(f"Conclusion a practitioner draws: 'The maximum difference in missingness rates is {dp_diff:.1%}. The groups are small, so it's not statistically significant. We pass the fairness check!'")
     
     print("\n--- DBIAS OUTPUT ---")
     result = audit(
@@ -50,7 +51,10 @@ def main():
     if finding:
         print(f"Severity: {finding.severity.name}")
         print(f"Detectability: {finding.detectability.name}")
-        print(f"Confidence Interval for Effect Size: [{finding.effect_size_ci[0]:.3f}, {finding.effect_size_ci[1]:.3f}]")
+        if finding.effect_size_ci is not None:
+            print(f"Confidence Interval for Effect Size: [{finding.effect_size_ci[0]:.3f}, {finding.effect_size_ci[1]:.3f}]")
+        else:
+            print("Confidence Interval for Effect Size: not computed")
         print(f"Verdict: {finding.equivalence_verdict}")
         if finding.severity.name == "BLIND_SPOT":
             print("Conclusion dbias draws: 'BLIND SPOT. You do not have the power to claim this is fair. The CI straddles the SESOI of 0.1.'")

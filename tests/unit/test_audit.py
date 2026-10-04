@@ -5,6 +5,7 @@ because severity depends on it; correction runs before severity because
 significance depends on it; and nothing may skip the detectability pass
 (docs/10 Sec 2, invariant 3).
 """
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -44,11 +45,16 @@ def test_every_finding_carries_a_corrected_p_value(result):
 
 
 def test_every_finding_carries_an_interval_and_an_mde(result):
+    """The one exception is power-guided descent: an underpowered intersection
+    may skip its bootstrap, and then reports no interval rather than a fake one."""
     for finding in result.findings:
         if finding.detectability is Detectability.EMPTY:
             continue
-        assert finding.effect_size_ci is not None
         assert finding.minimum_detectable_effect is not None
+        if finding.effect_size_ci is None:
+            assert "_AND_" in finding.sensitive_attribute
+            assert finding.detectability is Detectability.UNDERPOWERED
+            assert finding.equivalence_verdict is None
 
 
 def test_the_declared_sesoi_is_recorded_on_every_finding(result):
@@ -58,13 +64,73 @@ def test_the_declared_sesoi_is_recorded_on_every_finding(result):
     assert result.sesoi == pytest.approx(0.1)
 
 
-def test_all_three_analyzers_contributed(result):
+def test_all_four_analyzers_contributed(result):
     categories = {f.category for f in result.findings}
     assert categories == {
         Category.REPRESENTATION,
         Category.MISSINGNESS,
+        Category.FEATURE_DISPARITY,
         Category.LABEL_DISPARITY,
     }
+
+
+# --- intersections -----------------------------------------------------------
+
+def _independent_frame(n: int = 2000, seed: int = 0) -> pd.DataFrame:
+    """race, sex and the label are mutually independent, by construction."""
+    rng = np.random.default_rng(seed)
+    df = pd.DataFrame(
+        {
+            "race": rng.choice(["a", "b", "c"], n),
+            "sex": rng.choice(["F", "M"], n),
+            "y": rng.integers(0, 2, n),
+        }
+    )
+    df.loc[rng.choice(n, 6, replace=False), "race"] = np.nan
+    return df
+
+
+@pytest.fixture(scope="module")
+def independent_result():
+    return audit(
+        _independent_frame(), ["race", "sex"], "y", sesoi=0.1, seed=3, n_resamples=200
+    )
+
+
+def test_no_attribute_is_tested_against_an_intersection_built_from_it(independent_result):
+    """race vs race_AND_sex is a column against a function of itself: V = 1 on
+    any data. Neither direction of that comparison may appear."""
+    for f in independent_result.findings:
+        if f.target_feature is None:
+            continue
+        assert "_AND_" not in f.target_feature
+        if "_AND_" in f.sensitive_attribute:
+            assert f.target_feature not in f.sensitive_attribute.split("_AND_")
+
+
+def test_missing_parent_values_are_not_an_intersectional_group(independent_result):
+    rep = next(
+        f for f in independent_result.findings
+        if f.id == "REPRESENTATION_RACE_AND_SEX"
+    )
+    assert not any("nan" in level for level in rep.n_per_group)
+    assert rep.total_n == 2000 - 6
+
+
+def test_independent_data_raises_no_high_findings(independent_result):
+    assert not [
+        f for f in independent_result.findings
+        if f.severity in (Severity.HIGH, Severity.CRITICAL)
+    ]
+
+
+def test_finding_order_is_stable_across_intersections():
+    df = _independent_frame(n=400)
+    df["age"] = np.random.default_rng(1).choice(["young", "old"], len(df))
+    kwargs = dict(sesoi=0.1, seed=3, n_resamples=50)
+    a = audit(df, ["race", "sex", "age"], "y", **kwargs)
+    attrs = list(dict.fromkeys(f.sensitive_attribute for f in a.findings))
+    assert attrs == ["race", "sex", "age", "race_AND_sex", "race_AND_age", "sex_AND_age"]
 
 
 def test_summary_reports_risk_and_coverage(result):

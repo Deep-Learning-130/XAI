@@ -6,15 +6,21 @@ unobserved value itself, which is not identifiable from observed data at all;
 docs/03 Sec 2 mislabels the test and plan.md Sec 3.7 corrects it. Finding ids
 say MAR so the error does not propagate into the report.
 """
+from collections.abc import Mapping, Sequence
+
 import pandas as pd
 
-from dbias.analyzers.base import BaseAnalyzer, Hypothesis, slug
+from dbias.analyzers.base import BaseAnalyzer, Hypothesis, excluded_features, slug
 from dbias.models.enums import Category, EffectSizeMetric
 from dbias.models.finding import Finding
 from dbias.stats.chi_square import chi_square_test
 
 
 class MissingnessAnalyzer(BaseAnalyzer):
+    def __init__(self, intersections: Mapping[str, Sequence[str]] | None = None) -> None:
+        # Intersection column -> the attributes it was built from.
+        self.intersections = intersections or {}
+
     def analyze(
         self,
         df: pd.DataFrame,
@@ -28,7 +34,7 @@ class MissingnessAnalyzer(BaseAnalyzer):
                 continue
 
             for feature in df.columns:
-                if feature == attribute:
+                if feature in excluded_features(attribute, self.intersections):
                     continue
                 mask = df[feature].isna()
                 if not mask.any() or mask.all():

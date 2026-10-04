@@ -10,9 +10,16 @@ being scored as though the audit had seen clearly (docs/10 Sec 2, invariant 3).
 FDR family boundary. docs/02 says to pool every p-value in the audit into one
 family; this module does not. One family per (category, attribute) means an
 unrelated representation test cannot change the verdict on a missingness test,
-which is what pooling globally would allow. Intersections would descend inside
-these families with a hierarchical procedure -- out of scope here, and the
-family boundary is chosen so that descent can be added without redefining it.
+which is what pooling globally would allow.
+
+Intersections (depth 2, e.g. race_AND_sex) are treated as attributes in their
+own right, so each one is its own family per category. That is the same rule
+as for parent attributes, and the same caveat applies: FDR is controlled
+within a family, not across the audit, and adding intersections adds
+families. Hierarchical FDR -- conditioning a child's rejection on its
+parent's (Yekutieli) -- is not implemented; the family boundary is chosen so
+that it can be added without redefining it. Gating (correction/gating.py)
+only decides which underpowered children may skip their bootstrap.
 """
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -24,7 +31,7 @@ from dbias.analyzers.label_disparity import LabelDisparityAnalyzer
 from dbias.analyzers.missingness import MissingnessAnalyzer
 from dbias.analyzers.representation import RepresentationAnalyzer
 from dbias.analyzers.feature_disparity import FeatureDisparityAnalyzer
-from dbias.correction.hierarchy import build_intersections
+from dbias.correction.hierarchy import build_intersections, parents_of
 from dbias.correction.gating import power_guided_gating
 from dbias.detectability.classify import annotate_detectability
 from dbias.detectability.power import DEFAULT_ALPHA, DEFAULT_TARGET_POWER
@@ -81,15 +88,16 @@ def audit(
 
     # Step 1: Intersections
     df, tree = build_intersections(df, sensitive_cols)
-    child_cols = list(set([c for children in tree.values() for c in children]))
-    
+    parents = parents_of(tree)
+    child_cols = list(parents)
+
     def _run_analyzers(cols: list[str]) -> list[Hypothesis]:
         if not cols:
             return []
         hyps = []
         hyps += RepresentationAnalyzer(reference).analyze(df, cols)
-        hyps += MissingnessAnalyzer().analyze(df, cols)
-        hyps += FeatureDisparityAnalyzer().analyze(df, cols, target_col=target_col)
+        hyps += MissingnessAnalyzer(parents).analyze(df, cols)
+        hyps += FeatureDisparityAnalyzer(parents).analyze(df, cols, target_col=target_col)
         if target_col is not None:
             hyps += LabelDisparityAnalyzer().analyze(df, cols, target_col=target_col)
         return hyps
@@ -117,7 +125,7 @@ def audit(
     }
     
     child_hypotheses = _run_analyzers(child_cols)
-    gated_children = power_guided_gating(child_hypotheses, parent_findings, sesoi)
+    gated_children = power_guided_gating(child_hypotheses, parent_findings, parents)
     
     child_annotated = [
         annotate_detectability(

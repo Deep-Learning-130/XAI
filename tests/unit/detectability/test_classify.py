@@ -206,3 +206,32 @@ def test_gof_annotation_populates_the_same_fields():
     assert f.effect_size_ci is not None
     assert f.minimum_detectable_effect > 0
     assert 0.0 <= f.power_to_detect_sesoi <= 1.0
+
+
+# --- power-guided descent ----------------------------------------------------
+
+def test_skipped_interval_is_absent_not_invented():
+    """An underpowered cell asked to skip its bootstrap reports no interval and
+    no verdict -- never a placeholder dressed as a measurement."""
+    out = annotate(NULL_SMALL, skip_interval=True)
+    assert out.detectability is Detectability.UNDERPOWERED
+    assert out.effect_size_ci is None
+    assert out.equivalence_verdict is None
+
+
+def test_skip_is_ignored_when_the_cell_itself_is_adequately_powered():
+    out = annotate(NULL_LARGE, skip_interval=True)
+    assert out.detectability is Detectability.ADEQUATE
+    assert out.effect_size_ci is not None
+    assert out.equivalence_verdict is EquivalenceVerdict.EQUIVALENT
+
+
+def test_skewed_2x2_power_does_not_depend_on_an_unseeded_rng():
+    skewed = np.array([[950, 50], [45, 5]])
+    runs = {
+        annotate_detectability(
+            bare_finding(skewed, 0.0), skewed, sesoi=0.1, seed=None, n_resamples=50
+        ).power_to_detect_sesoi
+        for _ in range(3)
+    }
+    assert len(runs) == 1

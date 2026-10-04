@@ -15,7 +15,9 @@ the smaller cell rather than by the total, and this approximation errs
 *optimistic*. That is the dangerous direction for a tool whose purpose is
 honest null results. Callers must propagate `ChiSquareResult.is_skewed` and
 `.is_sparse` so affected cells are reported as approximate. A simulation-based
-fallback is the correct fix and is deliberately deferred (plan.md Sec 3.4).
+fallback is the correct fix (plan.md Sec 3.4); it exists for 2x2 tables
+(`simulate_power_2x2` / `simulate_mde_2x2`) and is still deferred for larger
+ones.
 """
 import math
 
@@ -130,6 +132,21 @@ def mde_chi_square(
     return float(optimize.brentq(shortfall, lo, hi, xtol=1e-12, rtol=1e-12))
 
 
+def max_reachable_w_2x2(minority_share: float, base_rate: float) -> float:
+    """Largest Cohen's w a 2x2 table with these margins can express.
+
+    `simulate_power_2x2` shifts the two groups' rates apart by d; the shift is
+    bounded by both rates staying inside [0, 1]. Past this point the
+    alternative does not exist, so it is the ceiling for any MDE search.
+    """
+    g2 = minority_share
+    g1 = 1.0 - g2
+    if not (0.0 < g2 < 1.0 and 0.0 < base_rate < 1.0):
+        return 0.0
+    d_max = min((1.0 - base_rate) / g2, base_rate / g1)
+    return d_max / math.sqrt(base_rate * (1.0 - base_rate) / (g1 * g2))
+
+
 def simulate_mde_2x2(
     n: int,
     minority_share: float,
@@ -139,20 +156,28 @@ def simulate_mde_2x2(
     n_sims: int = 5000,
     seed: int | None = None,
 ) -> float:
-    """Simulation-based MDE for a 2x2 table."""
+    """Simulation-based MDE for a 2x2 table.
+
+    Returns the analytic search ceiling (`_W_SEARCH[1]`) when no effect these
+    margins can express reaches `target_power` -- the same "nothing plausible
+    is detectable" sentinel `mde_chi_square` uses.
+    """
     def shortfall(w: float) -> float:
         return simulate_power_2x2(w, n, minority_share, base_rate, alpha, n_sims, seed) - target_power
 
-    lo, hi = _W_SEARCH
-    
-    # If the effect is unreachable or underpowered even at max w
-    if shortfall(hi) < 0:
-        return float(hi)
-        
+    lo = _W_SEARCH[0]
+    # Searching to the analytic ceiling would always fail: past the reachable
+    # maximum simulate_power_2x2 returns 0, so the bracket never changes sign.
+    # Back off a hair so the endpoint itself stays inside [0, 1] numerically.
+    hi = max_reachable_w_2x2(minority_share, base_rate) * (1.0 - 1e-9)
+
+    if hi <= lo or shortfall(hi) < 0:
+        return float(_W_SEARCH[1])
+
     try:
         return float(optimize.brentq(shortfall, lo, hi, xtol=1e-4, rtol=1e-4))
     except ValueError:
-        return float(hi)
+        return float(_W_SEARCH[1])
 
 
 def mde_cramers_v(

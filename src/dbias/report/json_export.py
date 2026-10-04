@@ -30,8 +30,9 @@ LIMITATIONS = [
     "Missingness findings detect MAR -- missingness that depends on an "
     "observed attribute. True MNAR is not identifiable from observed data.",
     "Minimum detectable effects are computed from a non-central chi-square "
-    "that ignores marginal structure. Cells flagged mde_is_approximate sit in "
-    "the skewed or sparse regime where this approximation errs optimistic.",
+    "that ignores marginal structure, except for skewed or sparse 2x2 tables, "
+    "which are simulated. Cells flagged mde_is_approximate are larger tables "
+    "in the skewed or sparse regime, where the approximation errs optimistic.",
     "This tool audits data. It does not audit models, and a clean dataset "
     "does not imply a fair model.",
 ]

@@ -1,13 +1,19 @@
 """Does a feature fall differently across sensitive groups?"""
+from collections.abc import Mapping, Sequence
+
 import pandas as pd
 
-from dbias.analyzers.base import BaseAnalyzer, Hypothesis, slug
+from dbias.analyzers.base import BaseAnalyzer, Hypothesis, excluded_features, slug
 from dbias.models.enums import Category, EffectSizeMetric
 from dbias.models.finding import Finding
 from dbias.stats.chi_square import chi_square_test
 
 
 class FeatureDisparityAnalyzer(BaseAnalyzer):
+    def __init__(self, intersections: Mapping[str, Sequence[str]] | None = None) -> None:
+        # Intersection column -> the attributes it was built from.
+        self.intersections = intersections or {}
+
     def analyze(
         self,
         df: pd.DataFrame,
@@ -21,7 +27,9 @@ class FeatureDisparityAnalyzer(BaseAnalyzer):
                 continue
 
             for feature in df.columns:
-                if feature == attribute or feature == target_col:
+                if feature == target_col or feature in excluded_features(
+                    attribute, self.intersections
+                ):
                     continue
                     
                 # We only test categorical features (or discrete features with few levels)
