@@ -45,6 +45,8 @@ def blind_spot_reading(finding: Finding) -> str:
     test was underpowered, or power looked adequate but the realised interval
     still did not rule out an effect at the SESOI.
     """
+    if finding.gated_by_parent:
+        return f"Not tested: {blind_spot_reason(finding)}. This is not a clean result."
     return f"No disparity was detected, but {blind_spot_reason(finding)}. This is not a clean result."
 
 
@@ -56,6 +58,12 @@ def blind_spot_reason(finding: Finding) -> str:
     separate Monte Carlo search and can disagree with the power by a hair.
     """
     sesoi = "the SESOI" if finding.sesoi is None else f"the SESOI (w = {finding.sesoi:.3f})"
+    if finding.gated_by_parent:
+        return (
+            f"it was never tested for significance, because neither parent "
+            f"attribute showed a disparity (hierarchical FDR), and its interval "
+            f"did not rule out {sesoi}"
+        )
     if finding.detectability is Detectability.UNDERPOWERED:
         mde_w = finding.mde_w
         reach = "" if mde_w is None else f"; it could only have caught w = {mde_w:.3f} or larger"
