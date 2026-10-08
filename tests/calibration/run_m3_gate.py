@@ -1,10 +1,27 @@
+import argparse
 import time
 from pathlib import Path
 import pandas as pd
 
-from harness import sweep
+from harness import Cell, rates_for, run_cell
+from parallel import run_cells
+
+
+def m3_cells(n_values, w_values, minority_shares, replicates, **kwargs) -> list[dict]:
+    """The reachable cells harness.sweep visits, in its order, as run_cell kwargs."""
+    return [
+        dict(cell=Cell(n=n, true_w=w, minority_share=share), replicates=replicates, **kwargs)
+        for n in n_values
+        for w in w_values
+        for share in minority_shares
+        if rates_for(w, share) is not None
+    ]
+
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--jobs", type=int, default=1, help="worker processes; results are identical")
+    args = parser.parse_args()
     print("Starting full M3 calibration gate...")
     
     n_values = [100, 500, 1000, 5000, 10000]
@@ -21,8 +38,8 @@ def main():
 
     start_time = time.time()
     
-    # Run the sweep
-    df = sweep(
+    # Run the sweep; each cell is seeded on its own, so --jobs changes nothing but time
+    cells = m3_cells(
         n_values=n_values,
         w_values=w_values,
         minority_shares=minority_shares,
@@ -31,6 +48,7 @@ def main():
         n_resamples=120, # keeping bootstrap resamples reasonable
         seed=42
     )
+    df = pd.DataFrame(run_cells(run_cell, cells, jobs=args.jobs))
     
     elapsed = time.time() - start_time
     print(f"\nCompleted in {elapsed:.1f} seconds.")

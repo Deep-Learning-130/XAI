@@ -51,6 +51,48 @@ def cramers_v(table: ArrayLike) -> float:
     return float(cohens_w(arr) / np.sqrt(k))
 
 
+def cramers_v_corrected_many(tables: np.ndarray) -> np.ndarray:
+    """Bias-corrected Cramer's V over a stack of same-shape tables, (B, r, k).
+
+    Vectorised because the bootstrap evaluates it thousands of times. The
+    shape (r, k) is the table's, not its non-empty margins', so every resample
+    of one table is corrected the same way. Expects every table to hold at
+    least two observations; :func:`cramers_v_corrected` validates that.
+    """
+    t = np.asarray(tables, dtype=float)
+    _, r, k = t.shape
+    n = t.sum(axis=(1, 2))
+    rows = t.sum(axis=2)
+    cols = t.sum(axis=1)
+    expected = rows[:, :, None] * cols[:, None, :] / n[:, None, None]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        chi2 = np.where(expected > 0, (t - expected) ** 2 / expected, 0.0).sum(axis=(1, 2))
+    phi2 = np.maximum(0.0, chi2 / n - (k - 1) * (r - 1) / (n - 1))
+    denom = np.minimum(k - (k - 1) ** 2 / (n - 1), r - (r - 1) ** 2 / (n - 1)) - 1.0
+    with np.errstate(divide="ignore", invalid="ignore"):
+        v = np.where(denom > 0, np.sqrt(phi2 / denom), 0.0)
+    return np.minimum(v, 1.0)
+
+
+def cramers_v_corrected(table: ArrayLike) -> float:
+    """Bergsma (2013) bias-corrected Cramer's V. Bounded [0, 1].
+
+    The plug-in V is biased upward: under independence E[chi2] is about
+    (r-1)(k-1), so a 16x2 table at n = 500 shows V near 0.17 with no
+    association at all. This subtracts the null expectation from phi^2 and
+    shrinks r and k to match. Not used in reports: an interval built on it
+    failed the false-all-clear calibration gate (results.md Sec 2), and a
+    corrected point estimate beside an uncorrected interval would be
+    inconsistent. Findings report the plug-in :func:`cramers_v`.
+    """
+    arr = _as_table(table)
+    if min(arr.shape) < 2:
+        raise ValueError("Cramer's V is undefined for a table with a single row or column")
+    if arr.sum() < 2:
+        raise ValueError("the bias correction needs at least two observations")
+    return float(cramers_v_corrected_many(arr[None, :, :])[0])
+
+
 def w_from_v(v: float, df_min: int) -> float:
     """Convert Cramer's V to Cohen's w. OVERRIDE 2 in the implementation plan.
 

@@ -132,3 +132,16 @@ def test_extreme_imbalance_makes_large_effects_unreachable():
     clipping, which would silently weaken the effect it claims to inject."""
     assert rates_for(true_w=0.5, minority_share=0.01) is None
     assert rates_for(true_w=0.1, minority_share=0.5) is not None
+
+
+def test_parallel_m3_cells_match_the_serial_sweep():
+    """run_m3_gate.py --jobs maps run_cell over the same cells sweep() visits."""
+    from harness import sweep
+    from run_m3_gate import m3_cells
+    from parallel import run_cells
+
+    grid = dict(n_values=[100], w_values=[0.0, 0.1], minority_shares=[0.5, 0.01])
+    kwargs = dict(replicates=5, sesoi=SESOI, n_resamples=30, seed=42)
+    serial = sweep(**grid, **kwargs).to_dict("records")
+    parallel = run_cells(run_cell, m3_cells(**grid, **kwargs), jobs=2)
+    assert parallel == serial

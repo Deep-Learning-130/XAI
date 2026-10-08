@@ -144,11 +144,11 @@ Run against Adult, COMPAS, and German Credit.
 - **The headline result:** identify at least one (attribute, feature) cell in a *real* benchmark that AIF360 or Fairlearn reports as clean and this tool marks as a blind spot. Verify the claim by running the incumbent tool, not by assuming.
 
 **Gate criterion:** that cell exists, is reproducible, and is defensible. If no such cell exists in any of the three benchmarks, the practical motivation for the whole project is weaker than assumed, and the write-up must say so honestly — probably reframing toward small-*n* clinical or regional datasets where the problem is severe by construction.
-**Result:** Known findings reproduce (Adult income by sex; COMPAS recidivism by race). Adult (N=32k) has 0 blind spots at `w=0.1`. COMPAS (N=7k) has 3, all on `vr_charge_degree`, a feature recorded for only 819 rows. Subsampled Adult (N=500) has 19, and for `MAR_WORKCLASS_RACE` Fairlearn's output was run side by side and reads as clean. See `results.md`. The COMPAS cells are candidates for the headline cell in a full-size benchmark, but still need an incumbent-tool comparison.
+**Result:** Known findings reproduce (Adult income by sex; COMPAS recidivism by race). Adult (N=32k) has 0 blind spots at `w=0.1`. COMPAS (N=7k) has 3, all on `vr_charge_degree`, a feature recorded for only 819 rows. Subsampled Adult (N=500) has 19, and for `MAR_WORKCLASS_RACE` Fairlearn's output was run side by side and reads as clean. See `results.md`. Full-size COMPAS does not meet the gate: Fairlearn flags its blind-spot cells as unfair rather than clean (small-group noise; `benchmarks/compare_compas.py`).
 
 ---
 
-## M7 — Intersectional gating (1.5 weeks) 🚦 **[PARTIAL: hierarchy and gating done; hierarchical FDR and its empirical check outstanding]**
+## M7 — Intersectional gating (1.5 weeks) 🚦 **[PARTIAL: hierarchy, gating and per-family FDR verified; hierarchical FDR was implemented, failed its empirical FDR gate and was removed — see results.md §3]**
 
 Now, and not before, descend into intersections.
 
