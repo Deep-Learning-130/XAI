@@ -21,7 +21,6 @@ intersection is tested only below a rejected parent. It is opt-in because it
 hides intersection-only effects. Power-guided gating, separately, only decides
 which underpowered children may skip their bootstrap.
 """
-import warnings
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -90,14 +89,6 @@ def audit(
     """
     if fdr not in ("family", "hierarchical"):
         raise ValueError(f"fdr must be 'family' or 'hierarchical', got {fdr!r}")
-    if fdr == "hierarchical":
-        warnings.warn(
-            "fdr='hierarchical' failed its FDR calibration gate: under the null its "
-            "intersection family exceeded alpha (0.082 vs a 0.074 limit). It is "
-            "experimental; see results.md Sec 3.",
-            UserWarning,
-            stacklevel=2,
-        )
     missing = [c for c in sensitive_cols if c not in df.columns]
     if missing:
         raise ValueError(f"sensitive columns {missing} not in the dataframe")

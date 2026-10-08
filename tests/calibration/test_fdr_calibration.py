@@ -19,9 +19,7 @@ def test_ground_truth_matches_the_construction():
 
 
 HIERARCHICAL_FAILS_UNDER_THE_NULL = pytest.mark.xfail(
-    # Not strict: the true FDR (~0.08) sits near this smoke test's 0.10 bound at
-    # 100 replicates, so a seed can land either side without the defect changing.
-    strict=False,
+    strict=True,
     reason="Hierarchical FDR failed its pre-registered gate: under the global null the "
     "intersection family's FDR is 0.082 (500 audits) against a 0.074 limit. Parent and "
     "child tests are positively dependent, so admitting a child after a chance parent "

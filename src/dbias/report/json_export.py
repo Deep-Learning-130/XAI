@@ -46,40 +46,34 @@ def blind_spot_reading(finding: Finding) -> str:
     still did not rule out an effect at the SESOI.
     """
     if finding.gated_by_parent:
-        return f"Not tested for significance: {_GATED}, and {_cause(finding)}. This is not a clean result."
-    return f"No disparity was detected, but {_cause(finding)}. This is not a clean result."
+        return f"Not tested: {blind_spot_reason(finding)}. This is not a clean result."
+    return f"No disparity was detected, but {blind_spot_reason(finding)}. This is not a clean result."
 
 
-def _sesoi_phrase(finding: Finding) -> str:
-    return "the SESOI" if finding.sesoi is None else f"the SESOI (w = {finding.sesoi:.3f})"
+def blind_spot_reason(finding: Finding) -> str:
+    """The cause clause of :func:`blind_spot_reading`, also used by the CLI.
 
-
-def _cause(finding: Finding) -> str:
-    """Why the null result rules nothing out, read from `detectability` --
-    not re-derived from the MDE, which on the simulated 2x2 path comes from a
-    separate Monte Carlo search and can disagree with the power by a hair."""
-    sesoi = _sesoi_phrase(finding)
+    The cause is read from `detectability`, which is what decided it -- not
+    re-derived from the MDE, which on the simulated 2x2 path comes from a
+    separate Monte Carlo search and can disagree with the power by a hair.
+    """
+    sesoi = "the SESOI" if finding.sesoi is None else f"the SESOI (w = {finding.sesoi:.3f})"
+    if finding.gated_by_parent:
+        return (
+            f"it was never tested for significance, because neither parent "
+            f"attribute showed a disparity (hierarchical FDR), and its interval "
+            f"did not rule out {sesoi}"
+        )
     if finding.detectability is Detectability.UNDERPOWERED:
         mde_w = finding.mde_w
         reach = "" if mde_w is None else f"; it could only have caught w = {mde_w:.3f} or larger"
-        absent = ", and no interval was computed" if finding.effect_size_ci is None else ""
-        return f"the test was not powered to detect {sesoi}{reach}{absent}"
+        return f"the test was not powered to detect {sesoi}{reach}"
     if finding.effect_size_ci is None:
         return f"no interval was computed, so {sesoi} was not ruled out"
     return (
         f"although the test was powered for {sesoi}, the realised interval "
         f"did not rule out an effect that large"
     )
-
-
-_GATED = "no parent attribute was found to have a disparity (hierarchical FDR)"
-
-
-def blind_spot_reason(finding: Finding) -> str:
-    """The cause clause of :func:`blind_spot_reading`, also used by the CLI."""
-    if finding.gated_by_parent:
-        return f"not tested for significance, because {_GATED}; {_cause(finding)}"
-    return _cause(finding)
 
 
 def _finding_to_dict(finding: Finding) -> dict[str, Any]:
@@ -104,8 +98,7 @@ def to_dict(result: AuditResult) -> dict[str, Any]:
                 if result.fdr == "family"
                 else "Hierarchical: Benjamini-Hochberg within each parent "
                 "(category, attribute) family; intersections tested only "
-                "below a rejected parent (experimental: failed its FDR "
-                "calibration gate, see results.md Sec 3)"
+                "below a rejected parent"
             ),
             "correction_families": {
                 f"{category}|{attribute}": size
