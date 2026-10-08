@@ -16,13 +16,13 @@ Intersections (depth 2, e.g. race_AND_sex) are treated as attributes in their
 own right, so each one is its own family per category. That is the same rule
 as for parent attributes, and the same caveat applies: FDR is controlled
 within a family, not across the audit, and adding intersections adds
-families. Hierarchical FDR -- conditioning a child's rejection on its
-parent's (Yekutieli) -- is not implemented; the family boundary is chosen so
-that it can be added without redefining it. Gating (correction/gating.py)
-only decides which underpowered children may skip their bootstrap.
+families. fdr="hierarchical" adds the conditioning (correction/gating.py): an
+intersection is tested only below a rejected parent. It is opt-in because it
+hides intersection-only effects. Power-guided gating, separately, only decides
+which underpowered children may skip their bootstrap.
 """
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
 
@@ -32,7 +32,11 @@ from dbias.analyzers.missingness import MissingnessAnalyzer
 from dbias.analyzers.representation import RepresentationAnalyzer
 from dbias.analyzers.feature_disparity import FeatureDisparityAnalyzer
 from dbias.correction.hierarchy import build_intersections, parents_of
-from dbias.correction.gating import correct_within_families, power_guided_gating
+from dbias.correction.gating import (
+    correct_within_families,
+    hierarchical_fdr,
+    power_guided_gating,
+)
 from dbias.detectability.classify import annotate_detectability
 from dbias.detectability.power import DEFAULT_ALPHA, DEFAULT_TARGET_POWER
 from dbias.models.enums import Category
@@ -40,6 +44,8 @@ from dbias.models.finding import Finding
 from dbias.rules.risk_vector import summarise
 from dbias.rules.severity import assign_severity
 from dbias.stats.intervals import DEFAULT_RESAMPLES
+
+FdrMode = Literal["family", "hierarchical"]
 
 
 @dataclass(frozen=True)
@@ -52,6 +58,7 @@ class AuditResult:
     alpha: float
     target_power: float
     correction_families: dict[tuple[Category, str], int] = field(default_factory=dict)
+    fdr: str = "family"
 
     @property
     def blind_spots(self) -> list[Finding]:
@@ -71,6 +78,7 @@ def audit(
     n_resamples: int = DEFAULT_RESAMPLES,
     seed: int | None = None,
     reference: dict[str, dict[str, float]] | None = None,
+    fdr: FdrMode = "family",
 ) -> AuditResult:
     """Audit `df` for disparities, and for what it could not have seen.
 
@@ -79,6 +87,8 @@ def audit(
     phrased in terms of it and a silent convention would put a 1988 rule of
     thumb at the centre of the user's compliance document.
     """
+    if fdr not in ("family", "hierarchical"):
+        raise ValueError(f"fdr must be 'family' or 'hierarchical', got {fdr!r}")
     missing = [c for c in sensitive_cols if c not in df.columns]
     if missing:
         raise ValueError(f"sensitive columns {missing} not in the dataframe")
@@ -142,7 +152,10 @@ def audit(
     
     annotated = base_annotated + child_annotated
 
-    corrected, families = correct_within_families(annotated, alpha=alpha)
+    if fdr == "hierarchical":
+        corrected, families = hierarchical_fdr(annotated, parents, alpha=alpha)
+    else:
+        corrected, families = correct_within_families(annotated, alpha=alpha)
     scored = [assign_severity(f) for f in corrected]
 
     return AuditResult(
@@ -152,4 +165,5 @@ def audit(
         alpha=alpha,
         target_power=target_power,
         correction_families=families,
+        fdr=fdr,
     )

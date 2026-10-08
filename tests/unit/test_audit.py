@@ -191,3 +191,55 @@ def test_an_unknown_sensitive_column_is_rejected():
     df, _ = make_audit_scenario(n=100, seed=1)
     with pytest.raises(ValueError, match="not in the dataframe"):
         audit(df, sensitive_cols=["nonexistent"], target_col="hired", sesoi=0.1)
+
+
+# --- hierarchical FDR ----------------------------------------------------------
+
+def _xor_frame(n_per_cell: int = 1000) -> pd.DataFrame:
+    """Missingness of x depends on race x sex in an XOR pattern: exactly 10%
+    missing in (a, F) and (b, M), exactly 40% otherwise. Built deterministically,
+    so each marginal rate is exactly 25%: both parent tests have chi2 = 0 and
+    p = 1, and only the intersection is real. (Random draws would let a parent
+    reach significance by chance and make the hierarchical tests flaky.)"""
+    cells = []
+    for race in ("a", "b"):
+        for sex in ("F", "M"):
+            rate = 0.10 if (race == "a") == (sex == "F") else 0.40
+            k = int(round(rate * n_per_cell))
+            x = np.r_[np.full(k, np.nan), np.ones(n_per_cell - k)]
+            cells.append(pd.DataFrame({"race": race, "sex": sex, "x": x}))
+    return pd.concat(cells, ignore_index=True)
+
+
+def _mar(result, attribute):
+    return next(f for f in result.findings if f.id == f"MAR_X_{attribute}")
+
+
+def test_family_mode_is_the_default_and_unchanged():
+    df = _xor_frame()
+    kwargs = dict(sesoi=0.1, seed=1, n_resamples=100)
+    default = audit(df, ["race", "sex"], **kwargs)
+    explicit = audit(df, ["race", "sex"], fdr="family", **kwargs)
+    assert default.findings == explicit.findings
+    assert default.fdr == "family"
+
+
+def test_family_mode_finds_an_intersection_only_effect():
+    result = audit(_xor_frame(), ["race", "sex"], sesoi=0.1, seed=1, n_resamples=100)
+    assert _mar(result, "RACE_AND_SEX").is_significant is True
+
+
+def test_hierarchical_mode_gates_it_but_never_calls_it_clean():
+    """The documented cost: the intersection-only effect is not tested. The
+    safety property: it is reported as a blind spot, not an all-clear."""
+    result = audit(_xor_frame(), ["race", "sex"], sesoi=0.1, seed=1, n_resamples=100, fdr="hierarchical")
+    child = _mar(result, "RACE_AND_SEX")
+    assert child.gated_by_parent is True
+    assert child.is_significant is False
+    assert child.severity is Severity.BLIND_SPOT
+    assert result.fdr == "hierarchical"
+
+
+def test_an_unknown_fdr_mode_is_rejected():
+    with pytest.raises(ValueError, match="fdr"):
+        audit(_xor_frame(n_per_cell=50), ["race"], sesoi=0.1, fdr="global")
