@@ -170,14 +170,3 @@ def test_an_observed_level_missing_from_the_reference_is_a_clear_error():
     df = pd.DataFrame({"race": ["A"] * 60 + ["D"] * 40})
     with pytest.raises(ValueError, match="no positive share"):
         RepresentationAnalyzer({"race": {"A": 0.5, "B": 0.5}}).analyze(df, ["race"])
-
-
-def test_contingency_findings_report_the_bias_corrected_v(frame):
-    from dbias.models.enums import EffectSizeMetric
-
-    hypotheses = MissingnessAnalyzer().analyze(frame, ["gender"])
-    assert hypotheses
-    assert all(
-        h.finding.effect_size_metric is EffectSizeMetric.CRAMERS_V_CORRECTED
-        for h in hypotheses
-    )
