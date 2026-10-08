@@ -43,6 +43,9 @@ class Finding:
     # Populated by stats/correction.py
     p_value_corrected: float | None = None
     is_significant: bool = False
+    # Hierarchical FDR only: True when no parent attribute was rejected, so
+    # this intersection was never tested for significance.
+    gated_by_parent: bool = False
 
     # What could have been found -- populated by detectability/
     effect_size_ci: tuple[float, float] | None = None
