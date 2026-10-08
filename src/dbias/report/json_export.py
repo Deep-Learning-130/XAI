@@ -85,13 +85,7 @@ def to_dict(result: AuditResult) -> dict[str, Any]:
             "sesoi_scale": "Cohen's w (converted to Cramer's V per table shape)",
             "alpha": result.alpha,
             "target_power": result.target_power,
-            "correction": (
-                "Benjamini-Hochberg within each (category, attribute) family"
-                if result.fdr == "family"
-                else "Hierarchical: Benjamini-Hochberg within each parent "
-                "(category, attribute) family; intersections tested only "
-                "below a rejected parent"
-            ),
+            "correction": "Benjamini-Hochberg within each (category, attribute) family",
             "correction_families": {
                 f"{category}|{attribute}": size
                 for (category, attribute), size in result.correction_families.items()
