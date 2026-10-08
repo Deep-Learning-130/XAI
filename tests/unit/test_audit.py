@@ -243,3 +243,8 @@ def test_hierarchical_mode_gates_it_but_never_calls_it_clean():
 def test_an_unknown_fdr_mode_is_rejected():
     with pytest.raises(ValueError, match="fdr"):
         audit(_xor_frame(n_per_cell=50), ["race"], sesoi=0.1, fdr="global")
+
+
+def test_hierarchical_mode_warns_that_it_failed_its_fdr_gate():
+    with pytest.warns(UserWarning, match="failed its FDR calibration gate"):
+        audit(_xor_frame(n_per_cell=50), ["race", "sex"], sesoi=0.1, n_resamples=20, fdr="hierarchical")

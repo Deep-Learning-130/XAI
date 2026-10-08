@@ -8,9 +8,11 @@ Two procedures:
 * ``hierarchical_fdr`` -- the same rule for parent attributes; an intersection
   is tested only if one of its parents was rejected for the same (category,
   target feature), and BH runs over the admitted intersections of each
-  family. Yekutieli (2008) proves FDR control for a tree; an intersection has
-  two parents, so its control here is verified empirically
-  (tests/calibration/run_fdr_gate.py), not assumed.
+  family. Yekutieli (2008) proves FDR control for a tree whose levels are
+  independent; here an intersection's table refines its parents', so the
+  levels are positively dependent. Measured empirically
+  (tests/calibration/run_fdr_gate.py), it FAILED its gate: under the null the
+  intersection family reached FDR 0.082 against a 0.074 limit. Experimental.
 
 ``power_guided_gating`` is unrelated to either: it only decides which
 underpowered intersections may skip their bootstrap.

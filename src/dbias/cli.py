@@ -58,9 +58,9 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--seed", type=int, default=None)
     run.add_argument(
         "--fdr", choices=["family", "hierarchical"], default="family",
-        help="multiple-testing procedure. 'hierarchical' tests an intersection "
-             "only below a parent with a disparity, and so cannot find "
-             "intersection-only effects.",
+        help="multiple-testing procedure. 'hierarchical' (experimental: it failed "
+             "its FDR calibration gate) tests an intersection only below a parent "
+             "with a disparity, and so cannot find intersection-only effects.",
     )
     run.add_argument("--out", default="out", help="directory for the report and figure")
 
