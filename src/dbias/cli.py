@@ -56,12 +56,6 @@ def _build_parser() -> argparse.ArgumentParser:
     run.add_argument("--power", type=float, default=0.80, dest="target_power")
     run.add_argument("--resamples", type=int, default=2000)
     run.add_argument("--seed", type=int, default=None)
-    run.add_argument(
-        "--fdr", choices=["family", "hierarchical"], default="family",
-        help="multiple-testing procedure. 'hierarchical' tests an intersection "
-             "only below a parent with a disparity, and so cannot find "
-             "intersection-only effects.",
-    )
     run.add_argument("--out", default="out", help="directory for the report and figure")
 
     demo = sub.add_parser(
@@ -155,7 +149,6 @@ def main(argv: list[str] | None = None) -> int:
             target_power=args.target_power,
             n_resamples=args.resamples,
             seed=args.seed,
-            fdr=args.fdr,
         )
     except ValueError as error:
         print(f"dbias: {error}", file=sys.stderr)

@@ -131,20 +131,3 @@ def test_blind_spot_reading_names_the_right_cause():
         f(0.2, 1, Detectability.ADEQUATE, ci=None)
     )
     assert "the SESOI" in blind_spot_reading(f(0.2, 1, Detectability.ADEQUATE, sesoi=None))
-
-
-def test_a_gated_blind_spot_says_it_was_never_tested():
-    from dbias.models.enums import Category, Detectability, EffectSizeMetric
-    from dbias.models.finding import Finding
-    from dbias.report.json_export import blind_spot_reading
-
-    gated = Finding(
-        id="T", category=Category.MISSINGNESS, sensitive_attribute="a_AND_b",
-        target_feature="x", metric_name="", observed_values={}, statistical_test="",
-        p_value_raw=1e-6, effect_size_metric=EffectSizeMetric.CRAMERS_V,
-        effect_size_value=0.3, n_per_group={}, sesoi=0.1, df_min=1,
-        minimum_detectable_effect=0.05, detectability=Detectability.ADEQUATE,
-        effect_size_ci=(0.2, 0.4), gated_by_parent=True,
-    )
-    assert "neither parent attribute" in blind_spot_reading(gated)
-    assert blind_spot_reading(gated).startswith("Not tested")

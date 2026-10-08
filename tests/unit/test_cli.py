@@ -115,21 +115,3 @@ def test_a_malformed_csv_is_reported_not_raised(tmp_path, capsys):
     code = main(["audit", str(path), "--sensitive", "g", "--sesoi", "0.1"])
     assert code == 2
     assert "cannot read" in capsys.readouterr().err
-
-
-def test_hierarchical_fdr_is_selectable_and_recorded(csv_path, tmp_path):
-    out = tmp_path / "out"
-    code = main([
-        "audit", str(csv_path), "--sensitive", "gender", "--sensitive", "ethnicity",
-        "--target", "hired", "--sesoi", "0.1", "--fdr", "hierarchical",
-        "--out", str(out), "--resamples", "50", "--seed", "7",
-    ])
-    assert code == 0
-    report = json.loads((out / "audit.json").read_text())
-    assert report["configuration"]["correction"].startswith("Hierarchical")
-
-
-def test_an_unknown_fdr_flag_is_an_argument_error(csv_path):
-    with pytest.raises(SystemExit) as exit_info:
-        main(["audit", str(csv_path), "--sensitive", "gender", "--sesoi", "0.1", "--fdr", "global"])
-    assert exit_info.value.code == 2
