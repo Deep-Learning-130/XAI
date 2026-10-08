@@ -160,7 +160,7 @@ Now, and not before, descend into intersections.
 
 ---
 
-## M8 — Write-up (2 weeks, overlappable with M7)
+## M8 — Write-up (2 weeks, overlappable with M7) **[DRAFT: [docs/paper/writeup.md](docs/paper/writeup.md)]**
 
 - Write `docs/09_detectability.md` properly — this should actually happen at the *start* of M2, not here; it is listed here only so it is never forgotten.
 - Paper structure: the null-result problem → TOST/SESOI formulation → coverage map → calibration experiment (Figure 1) → benchmark blind spot (Figure 2) → limitations.
