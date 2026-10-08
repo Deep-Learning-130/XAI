@@ -28,7 +28,10 @@ _REGISTRY: dict[EffectSizeMetric, Ladder] = {
     EffectSizeMetric.KS_STATISTIC: (0.1, 0.2, 0.3),
 }
 
-_DF_ADJUSTED = {EffectSizeMetric.CRAMERS_V: EffectSizeMetric.COHENS_W}
+_DF_ADJUSTED = {
+    EffectSizeMetric.CRAMERS_V: EffectSizeMetric.COHENS_W,
+    EffectSizeMetric.CRAMERS_V_CORRECTED: EffectSizeMetric.COHENS_W,
+}
 
 
 def thresholds_for(metric: EffectSizeMetric, df_min: int | None = None) -> Ladder:
