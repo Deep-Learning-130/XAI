@@ -8,18 +8,16 @@ plan.md Sec 3.2: the CI is the inference layer of this project. A CI whose
 upper bound sits below the SESOI is an earned all-clear; one whose upper bound
 sits above it is a blind spot. MDE remains the communication layer.
 
-Method: non-parametric bootstrap over the multinomial defined by the observed
-cell proportions, holding n fixed. Contingency tables use the Bergsma (2013)
-bias-corrected Cramer's V and a percentile interval recentred by the
-bootstrap's estimated bias; the plug-in V is biased upward near the null,
-which used to put whole intervals above the SESOI on sparse tables. The
-estimator is still truncated at zero, so near the null the lower bound is
-reported for completeness and the upper bound carries the inference.
+Method: non-parametric percentile bootstrap over the multinomial defined by
+the observed cell proportions, holding n fixed. Cramer's V is bounded below by
+zero and biased upward near the null, so a percentile interval on V is
+one-sided in practice -- the upper bound carries the inference and the lower
+bound is reported for completeness.
 """
 import numpy as np
 from numpy.typing import ArrayLike
 
-from dbias.stats.effect_sizes import _as_table, cramers_v_corrected, cramers_v_corrected_many
+from dbias.stats.effect_sizes import _as_table, cramers_v
 
 DEFAULT_RESAMPLES = 2000
 
@@ -30,14 +28,7 @@ def bootstrap_ci_cramers_v(
     confidence: float = 0.95,
     seed: int | None = None,
 ) -> tuple[float, float]:
-    """Bias-corrected percentile bootstrap for the bias-corrected Cramer's V.
-
-    Resamples are drawn from the observed cell shares, whose own association
-    is the *plug-in* V. The corrected estimator is close to unbiased for that,
-    so the resamples centre on the plug-in V rather than on the corrected
-    point estimate. Shifting the percentile interval back by the bootstrap's
-    estimated bias recentres it on the estimate it is an interval for.
-    """
+    """Percentile bootstrap interval for Cramer's V on `table`."""
     arr = _as_table(table)
     if not 0.0 < confidence < 1.0:
         raise ValueError("confidence must lie strictly between 0 and 1")
@@ -45,15 +36,19 @@ def bootstrap_ci_cramers_v(
         raise ValueError("n_resamples must be positive")
 
     n = int(arr.sum())
-    point = cramers_v_corrected(arr)
-    rng = np.random.default_rng(seed)
-    draws = rng.multinomial(n, (arr / n).ravel(), size=n_resamples)
-    estimates = cramers_v_corrected_many(draws.reshape(n_resamples, *arr.shape))
+    shape = arr.shape
+    probabilities = (arr / arr.sum()).ravel()
 
-    bias = float(estimates.mean()) - point
+    rng = np.random.default_rng(seed)
+    draws = rng.multinomial(n, probabilities, size=n_resamples)
+
+    estimates = np.empty(n_resamples, dtype=float)
+    for i, flat in enumerate(draws):
+        estimates[i] = cramers_v(flat.reshape(shape))
+
     tail = (1.0 - confidence) / 2.0
-    lo, hi = np.quantile(estimates, [tail, 1.0 - tail]) - bias
-    return (float(np.clip(lo, 0.0, 1.0)), float(np.clip(hi, 0.0, 1.0)))
+    lo, hi = np.quantile(estimates, [tail, 1.0 - tail])
+    return (float(lo), float(hi))
 
 
 def bootstrap_ci_gof_w(

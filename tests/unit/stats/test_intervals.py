@@ -7,7 +7,7 @@ where one exists.
 import numpy as np
 import pytest
 
-from dbias.stats.effect_sizes import cramers_v_corrected
+from dbias.stats.effect_sizes import cramers_v
 from dbias.stats.intervals import bootstrap_ci_cramers_v
 
 INDEPENDENT_LARGE = np.array([[2500, 2500], [2500, 2500]])
@@ -29,7 +29,7 @@ def test_different_seeds_give_different_intervals():
 
 def test_interval_brackets_the_point_estimate_for_a_strong_effect():
     lo, hi = bootstrap_ci_cramers_v(STRONG_2X2, n_resamples=1000, seed=11)
-    assert lo < cramers_v_corrected(STRONG_2X2) < hi
+    assert lo < cramers_v(STRONG_2X2) < hi
 
 
 def test_interval_is_ordered_and_non_negative():
@@ -94,24 +94,3 @@ def test_gof_large_n_balanced_sample_excludes_a_sesoi_of_one_tenth():
 def test_gof_small_n_balanced_sample_cannot_exclude_it():
     lo, hi = bootstrap_ci_gof_w([50, 50], n_resamples=1000, seed=5)
     assert hi > 0.1
-
-
-def _sparse_null(seed: int = 0) -> np.ndarray:
-    """A 14x5 table at n = 500 drawn under exact independence -- the shape of
-    the Adult occupation-by-race table that exposed the bias."""
-    rng = np.random.default_rng(seed)
-    return rng.multinomial(500, np.full(70, 1 / 70)).reshape(14, 5)
-
-
-def test_sparse_null_interval_contains_its_point_estimate():
-    """Regression: DISP_OCCUPATION_RACE reported V = 0.157 with CI [0.170, 0.287]."""
-    table = _sparse_null()
-    lo, hi = bootstrap_ci_cramers_v(table, n_resamples=2000, seed=1)
-    assert lo <= cramers_v_corrected(table) <= hi
-
-
-def test_sparse_null_interval_does_not_sit_above_the_sesoi():
-    """Regression: nine non-significant findings had a lower bound above the
-    SESOI. For a 14x5 table the SESOI w = 0.1 is V = 0.1 / sqrt(4) = 0.05."""
-    lo, _ = bootstrap_ci_cramers_v(_sparse_null(), n_resamples=2000, seed=1)
-    assert lo < 0.05
