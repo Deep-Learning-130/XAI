@@ -21,7 +21,7 @@ parent's (Yekutieli) -- is not implemented; the family boundary is chosen so
 that it can be added without redefining it. Gating (correction/gating.py)
 only decides which underpowered children may skip their bootstrap.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import pandas as pd
@@ -32,13 +32,14 @@ from dbias.analyzers.missingness import MissingnessAnalyzer
 from dbias.analyzers.representation import RepresentationAnalyzer
 from dbias.analyzers.feature_disparity import FeatureDisparityAnalyzer
 from dbias.correction.hierarchy import build_intersections, parents_of
-from dbias.correction.gating import correct_within_families, power_guided_gating
+from dbias.correction.gating import power_guided_gating
 from dbias.detectability.classify import annotate_detectability
 from dbias.detectability.power import DEFAULT_ALPHA, DEFAULT_TARGET_POWER
 from dbias.models.enums import Category
 from dbias.models.finding import Finding
 from dbias.rules.risk_vector import summarise
 from dbias.rules.severity import assign_severity
+from dbias.stats.correction import benjamini_hochberg
 from dbias.stats.intervals import DEFAULT_RESAMPLES
 
 
@@ -142,7 +143,7 @@ def audit(
     
     annotated = base_annotated + child_annotated
 
-    corrected, families = correct_within_families(annotated, alpha=alpha)
+    corrected, families = _correct_within_families(annotated, alpha=alpha)
     scored = [assign_severity(f) for f in corrected]
 
     return AuditResult(
@@ -153,3 +154,22 @@ def audit(
         target_power=target_power,
         correction_families=families,
     )
+
+
+def _correct_within_families(
+    findings: list[Finding], alpha: float
+) -> tuple[list[Finding], dict[tuple[Category, str], int]]:
+    """Apply BH within each (category, attribute) family, preserving order."""
+    groups: dict[tuple[Category, str], list[int]] = {}
+    for index, finding in enumerate(findings):
+        key = (finding.category, finding.sensitive_attribute)
+        groups.setdefault(key, []).append(index)
+
+    out = list(findings)
+    for key, indices in groups.items():
+        adjusted = benjamini_hochberg([findings[i].p_value_raw for i in indices])
+        for i, p in zip(indices, adjusted):
+            out[i] = replace(
+                out[i], p_value_corrected=p, is_significant=bool(p < alpha)
+            )
+    return out, {key: len(indices) for key, indices in groups.items()}
