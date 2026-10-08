@@ -59,7 +59,7 @@ class MissingnessAnalyzer(BaseAnalyzer):
                     },
                     statistical_test="Chi-square test of independence",
                     p_value_raw=result.p_value,
-                    effect_size_metric=EffectSizeMetric.CRAMERS_V,
+                    effect_size_metric=EffectSizeMetric.CRAMERS_V_CORRECTED,
                     effect_size_value=result.effect_size,
                     n_per_group={
                         str(level): int(count)

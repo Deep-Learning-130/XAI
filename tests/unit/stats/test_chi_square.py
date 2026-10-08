@@ -46,8 +46,8 @@ def test_exact_independence_gives_p_of_one():
     assert result.p_value == pytest.approx(1.0)
 
 
-def test_effect_size_is_cramers_v():
-    assert chi_square_test(BALANCED_2X2).effect_size == pytest.approx(1 / 3, abs=1e-12)
+def test_effect_size_is_bias_corrected_cramers_v():
+    assert chi_square_test(BALANCED_2X2).effect_size == pytest.approx(5 / np.sqrt(261), abs=1e-12)
 
 
 def test_sparse_table_is_flagged_for_the_chi_square_approximation():

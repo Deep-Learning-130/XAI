@@ -15,7 +15,7 @@ from scipy import stats
 from dbias.stats.effect_sizes import (
     _as_table,
     chi_square_statistic,
-    cramers_v,
+    cramers_v_corrected,
     df_min,
 )
 
@@ -46,7 +46,7 @@ class ChiSquareResult:
     p_value: float
     dof: int
     df_min: int
-    effect_size: float  # Cramer's V
+    effect_size: float  # bias-corrected Cramer's V (Bergsma 2013) for independence; Cohen's w for GoF
     n: int
     min_expected: float
     margin_ratio: float
@@ -73,6 +73,9 @@ def chi_square_test(table: ArrayLike) -> ChiSquareResult:
     non-central chi-square used for the MDE are both defined on the
     uncorrected statistic, and mixing the two would make the reported effect
     size inconsistent with the reported detectability.
+
+    The effect size is the Bergsma (2013) bias-corrected V; the plug-in V
+    overstates association on sparse tables.
     """
     arr = _as_table(table)
     n = int(arr.sum())
@@ -94,7 +97,7 @@ def chi_square_test(table: ArrayLike) -> ChiSquareResult:
         p_value=p_value,
         dof=dof,
         df_min=df_min(arr),
-        effect_size=cramers_v(arr),
+        effect_size=cramers_v_corrected(arr),
         n=n,
         min_expected=float(expected.min()),
         margin_ratio=margin_ratio,
