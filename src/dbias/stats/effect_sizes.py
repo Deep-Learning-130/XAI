@@ -80,7 +80,10 @@ def cramers_v_corrected(table: ArrayLike) -> float:
     The plug-in V is biased upward: under independence E[chi2] is about
     (r-1)(k-1), so a 16x2 table at n = 500 shows V near 0.17 with no
     association at all. This subtracts the null expectation from phi^2 and
-    shrinks r and k to match, which is what every finding now reports.
+    shrinks r and k to match. Not used in reports: an interval built on it
+    failed the false-all-clear calibration gate (results.md Sec 2), and a
+    corrected point estimate beside an uncorrected interval would be
+    inconsistent. Findings report the plug-in :func:`cramers_v`.
     """
     arr = _as_table(table)
     if min(arr.shape) < 2:

@@ -1,4 +1,6 @@
-"""Reduced FDR check: 100 replicates per cell, loose bounds."""
+"""Reduced FDR check for the default per-family correction: 100 replicates
+per cell, loose bounds. Hierarchical FDR was measured here, failed its gate
+and was removed; see fdr_harness.py for where to reproduce it."""
 import sys
 from pathlib import Path
 
@@ -18,26 +20,9 @@ def test_ground_truth_matches_the_construction():
     assert real[("y", "race")] is True and real[("y", "sex")] is False
 
 
-HIERARCHICAL_FAILS_UNDER_THE_NULL = pytest.mark.xfail(
-    strict=True,
-    reason="Hierarchical FDR failed its pre-registered gate: under the global null the "
-    "intersection family's FDR is 0.082 (500 audits) against a 0.074 limit. Parent and "
-    "child tests are positively dependent, so admitting a child after a chance parent "
-    "rejection inflates it. See tests/calibration/results/fdr_calibration_results.csv.",
-)
-
-
-@pytest.mark.parametrize(
-    "scenario, fdr",
-    [
-        ("global_null", "family"),
-        pytest.param("global_null", "hierarchical", marks=HIERARCHICAL_FAILS_UNDER_THE_NULL),
-        ("xor", "family"),
-        ("xor", "hierarchical"),
-    ],
-)
-def test_every_family_stays_near_alpha(scenario, fdr):
-    row = run_fdr_cell(scenario, n=2000, replicates=100, fdr=fdr, seed=3)
+@pytest.mark.parametrize("scenario", ["global_null", "xor"])
+def test_every_family_stays_near_alpha(scenario):
+    row = run_fdr_cell(scenario, n=2000, replicates=100, fdr="family", seed=3)
     for name in FAMILIES:
         assert row[f"fdr_{name}"] <= 0.10, name
 
@@ -50,9 +35,11 @@ def test_audit_wide_fdr_is_reported_not_controlled():
     assert row["fdr_audit_wide"] >= row["fdr_race"]
 
 
-def test_hierarchical_cannot_see_xor_effects_and_family_can():
-    """The documented trade-off, measured rather than asserted in prose."""
-    hier = run_fdr_cell("xor", n=2000, replicates=50, fdr="hierarchical", seed=4)
-    flat = run_fdr_cell("xor", n=2000, replicates=50, fdr="family", seed=4)
-    assert hier["intersection_power"] < 0.2
-    assert flat["intersection_power"] > 0.8
+def test_family_correction_finds_intersection_only_effects():
+    row = run_fdr_cell("xor", n=2000, replicates=50, fdr="family", seed=4)
+    assert row["intersection_power"] > 0.8
+
+
+def test_the_removed_procedure_is_refused_with_a_pointer():
+    with pytest.raises(ValueError, match="649da32"):
+        run_fdr_cell("xor", n=200, replicates=1, fdr="hierarchical")

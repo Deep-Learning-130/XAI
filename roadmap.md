@@ -148,7 +148,7 @@ Run against Adult, COMPAS, and German Credit.
 
 ---
 
-## M7 — Intersectional gating (1.5 weeks) 🚦 **[PARTIAL: hierarchy, gating and per-family FDR verified; hierarchical FDR implemented but failed its empirical FDR gate — see results.md §3]**
+## M7 — Intersectional gating (1.5 weeks) 🚦 **[PARTIAL: hierarchy, gating and per-family FDR verified; hierarchical FDR was implemented, failed its empirical FDR gate and was removed — see results.md §3]**
 
 Now, and not before, descend into intersections.
 

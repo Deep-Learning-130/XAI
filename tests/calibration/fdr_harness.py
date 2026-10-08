@@ -5,6 +5,11 @@ Two binary sensitive attributes, race in {a, b} and sex in {F, M}, each
 set per (race, sex) cell by a 2x2 rate table. Ground truth follows from the
 table: race is a real effect for x_j iff its marginal rates differ, sex
 likewise, and race_AND_sex iff the four cell rates are not all equal.
+
+Hierarchical FDR (fdr="hierarchical") was measured with this harness, failed
+its gate, and was removed from the audit. The hierarchical rows of
+results/fdr_calibration_results.csv are the record; to reproduce them, check
+out commit 649da32. On the current code only the default per-family procedure runs.
 """
 import numpy as np
 import pandas as pd
@@ -64,6 +69,10 @@ def _mean_se(values: list[float]) -> tuple[float, float]:
 
 def run_fdr_cell(scenario: str, n: int, replicates: int, fdr: str, alpha: float = 0.05, seed: int = 0) -> dict:
     """One row: per-family FDR (gated), audit-wide FDR and power (reported)."""
+    if fdr != "family":
+        raise ValueError(
+            f"fdr={fdr!r} was removed after failing this gate; reproduce at commit 649da32"
+        )
     rates = SCENARIOS[scenario]
     real = truth(rates)
     rng = np.random.default_rng(seed)
@@ -74,7 +83,7 @@ def run_fdr_cell(scenario: str, n: int, replicates: int, fdr: str, alpha: float 
     for _ in range(replicates):
         result = audit(
             simulate(rates, n, rng), ["race", "sex"], sesoi=0.1, alpha=alpha,
-            n_resamples=20, seed=int(rng.integers(1 << 31)), fdr=fdr,
+            n_resamples=20, seed=int(rng.integers(1 << 31)),
         )
         missing = [f for f in result.findings if f.id.startswith("MAR_")]
         pooled_fdp.append(_fdp(missing, real))

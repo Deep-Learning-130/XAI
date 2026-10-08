@@ -27,7 +27,6 @@ class Category(StrEnum):
 
 class EffectSizeMetric(StrEnum):
     CRAMERS_V = "Cramer's V"
-    CRAMERS_V_CORRECTED = "Cramer's V (bias-corrected)"
     COHENS_W = "Cohen's w"
     RANK_BISERIAL = "Rank-Biserial Correlation"
     ETA_SQUARED = "Eta-Squared"
