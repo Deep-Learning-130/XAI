@@ -75,8 +75,21 @@ Conclusion dbias draws: 'BLIND SPOT. You do not have the power to claim this is 
 - On the N=500 subsampled Adult run, the tool generated 13 intersectional findings (`sex + race`). For 5 of them the parent attribute was underpowered *and* the intersection itself was underpowered, so the bootstrap was skipped.
 - Skipped intersections are reported as explicit blind spots with **no interval** (e.g. `MAR_WORKCLASS_SEX_AND_RACE`), rather than an invented one.
 
-**Not yet done** — the roadmap's "done when" criteria for M7 are not all met:
-- Hierarchical FDR (Yekutieli-style) is **not implemented**. Each intersection is corrected as its own (category, attribute) family, the same rule as for parent attributes, so FDR is controlled within a family but not across the audit.
-- The audit's FDR with intersections has **not been verified empirically** in the M3 harness.
+**FDR, measured** (`tests/calibration/run_fdr_gate.py`; 500 simulated audits per row, n = 2,000, two binary attributes, ten features; results in `tests/calibration/results/fdr_calibration_results.csv`). `family` is the default: BH within each (category, attribute) family, intersections included. `hierarchical` (opt-in, `fdr="hierarchical"`) tests an intersection only below a parent with a disparity.
 
-**Meaning:** Gating bounds compute and keeps untested intersections visible as blind spots instead of quietly passing them. It does not, by itself, control multiplicity.
+| Scenario | Procedure | Worst per-family FDR (± SE) | Audit-wide FDR (± SE) | Intersection power | Parent power |
+|---|---|---|---|---|---|
+| global null | family | 0.042 (0.009) | 0.098 (0.013) | — | — |
+| global null | hierarchical | **0.082 (0.012)** | 0.082 (0.012) | — | — |
+| main effect | family | 0.032 (0.008) | 0.029 (0.003) | 1.000 | 1.000 |
+| main effect | hierarchical | 0.032 (0.008) | 0.025 (0.003) | 1.000 | 1.000 |
+| xor | family | 0.064 (0.011) | 0.040 (0.004) | 1.000 | — |
+| xor | hierarchical | 0.064 (0.011) | 0.074 (0.010) | **0.017** | — |
+| mixed | family | 0.042 (0.004) | 0.031 (0.003) | 1.000 | 1.000 |
+| mixed | hierarchical | 0.042 (0.004) | 0.033 (0.003) | 0.516 | 1.000 |
+
+**The pre-registered gate (every family's FDR ≤ α + 2 SE) passed for `family` and failed for `hierarchical`**: under the global null its intersection family reached 0.082 against a limit of 0.074. The reason is structural. An intersection's table refines its parent's, so the two tests are positively dependent; admitting an intersection only after a parent rejection selects exactly the data whose chance imbalance also makes the intersection look significant. Yekutieli's guarantee assumes independence between levels, which this tree does not have. FDR is controlled within each (category, attribute) family, not across the audit; the audit-wide column shows how far apart those are.
+
+**The trade-off, measured.** In the `xor` scenario — missingness that depends on race × sex with no marginal disparity — the default per-family correction detected the intersection effect in 100% of audits; hierarchical correction in 1.7%, and its audit-wide FDR was higher, not lower (0.074 against 0.040). Hierarchical audits report those cells as blind spots, never as clean, but on this evidence the opt-in procedure buys a small drop in audit-wide FDR under the global null (0.098 to 0.082) at a large cost, and the default stays `family`.
+
+**Meaning:** Gating bounds compute and keeps untested intersections visible as blind spots instead of quietly passing them. Per-family BH holds its FDR, including for intersections; nothing here controls FDR across the whole audit.
